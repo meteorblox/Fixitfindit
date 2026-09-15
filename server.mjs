@@ -98,7 +98,10 @@ export const server = http.createServer(async (req, res) => {
           catch(e) { options.shippingError=e.message; }
         }
         page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
-        if(!store && product.pricedVariants?.length) page=page.replace('<strong>Not available to purchase yet</strong>','<p><a href="/checkout/products">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>');
+        if(!store && product.pricedVariants?.length) {
+          const chosen=product.pricedVariants.find(v=>v.id===options.vid)||product.pricedVariants[0];
+          page=page.replace('<strong>Not available to purchase yet</strong>',`<p><a href="/checkout/products?variant=${encodeURIComponent(chosen.id)}">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>`);
+        }
       }
       return send(error?503:200,'text/html',page);
     }
