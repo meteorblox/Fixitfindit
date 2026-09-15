@@ -24,6 +24,7 @@ for (const store of stores) {
 }
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
+  ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
   ['/site.css', 'text/css'], ['/brand.css', 'text/css'],
   ['/hero-products.png', 'image/png'], ['/fix-it-find-it-logo.png', 'image/png']
 ]);
