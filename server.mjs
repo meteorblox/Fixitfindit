@@ -35,7 +35,7 @@ export function renderStore(store) {
   const prefix = store ? `/shop/${store.slug}` : '';
   html = html.replace(/<main id="top">[\s\S]*?<\/main>/,homeContent(prefix))
     .replaceAll('href="#best"', 'href="#browse"').replace('Best finds','Browse categories').replace('See the fixes','Explore the catalog')
-    .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home. · Catalog preview')
+    .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home.')
     .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
     .replace('href="#organize"','href="'+prefix+'/category/organization"');
   if (!store) return html;
