@@ -42,7 +42,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
 
 export function testPage(message = '', enabled = true) {
   const safe = message.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Test checkout · FixItFindIt</title><style>body{margin:0;background:#f7f5ef;color:#173c35;font:17px/1.6 system-ui}main{max-width:560px;margin:8vh auto;padding:32px;background:white;border-radius:22px}h1{line-height:1.2}button{background:#216653;color:white;padding:15px 24px;border:0;border-radius:9px;font:inherit;cursor:pointer}a{color:#216653}.status{padding:14px;background:#eef4ef;border-radius:8px}</style></head><body><main><a href="/">FixItFindIt</a><p>STRIPE SANDBOX</p><h1>Let’s test checkout.</h1><p>This is a simulated <strong>$1.00 USD</strong> payment. No money moves, no products ship, and no partner commission is earned.</p>${safe ? `<p class="status">${safe}</p>` : ''}<p>Use test card <strong>4242 4242 4242 4242</strong>, any future expiry date and any three-digit CVC. Use test details, not a real card.</p>${enabled ? '<form method="post" action="/checkout/test/start"><button type="submit">Open test checkout →</button></form>' : ''}<p><small>Product ordering will be enabled separately after pricing, shipping and order handling are ready.</small></p></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Test checkout · FixItFindIt</title><style>body{margin:0;background:#f7f5ef;color:#173c35;font:17px/1.6 system-ui}main{max-width:560px;margin:8vh auto;padding:32px;background:white;border-radius:22px}h1{line-height:1.2}button{background:#216653;color:white;padding:15px 24px;border:0;border-radius:9px;font:inherit;cursor:pointer}a{color:#216653}.status{padding:14px;background:#eef4ef;border-radius:8px}</style></head><body><main><a href="/">FixItFindIt</a><p>STRIPE SANDBOX</p><h1>Let’s test checkout.</h1><p>This is a simulated <strong>$1.00 USD</strong> payment. No money moves, no products ship, and no partner commission is earned.</p>${safe ? `<p class="status">${safe}</p>` : ''}<p>Use test card <strong>4242 4242 4242 4242</strong>, any future expiry date and any three-digit CVC. Use test details, not a real card.</p>${enabled ? '<form method="post" action="/checkout/test/start"><button type="submit">Open test checkout →</button></form>' : ''}<p><a href="https://www.fixitfindit.com/checkout/test">Start a fresh test</a></p><p><small>Product ordering will be enabled separately after pricing, shipping and order handling are ready.</small></p></main></body></html>`;
 }
 
 const checkout = createCheckout();
@@ -50,7 +50,7 @@ const allowedOrigins = new Set(['https://www.fixitfindit.com','https://fixitfind
 export async function checkoutRoute(req, res, url) {
   if (!url.pathname.startsWith('/checkout/test')) return false;
   const page = (code, message, enabled = checkout.enabled()) => {
-    res.writeHead(code, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'});
+    res.writeHead(code, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'same-origin','X-Content-Type-Options':'nosniff'});
     res.end(req.method === 'HEAD' ? undefined : testPage(message, enabled));
   };
   const cookie = req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('fit_test='))?.slice(9);
@@ -71,3 +71,4 @@ export async function checkoutRoute(req, res, url) {
   } catch { page(503,'Unable to verify or start the test payment. Check the sandbox key and try again.',false); }
   return true;
 }
+
