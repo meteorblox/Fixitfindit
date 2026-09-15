@@ -54,13 +54,20 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
           hasVideo:p.isVideo === 1,category:slug
         }));
         for(const selected of selectedProducts.filter(p=>p.category===slug)) {
+          let loaded=false;
           try {
             const item=await call('/product/query?'+new URLSearchParams(selected.lookup),{headers:{'CJ-Access-Token':access}});
-            if(!item?.pid) continue;
+            if(!item?.pid) throw new Error('Selected product details unavailable');
             const existing=products.findIndex(p=>p.id===String(item.pid));
             if(existing>=0) products.splice(existing,1);
             products.unshift({...selected,id:String(item.pid),image:safeImage(item.bigImage || item.productImage),supplierPrice:String(item.sellPrice??''),listings:Number(item.listedNum)||0,hasVideo:false});
+            loaded=true;
           } catch { /* A selected product lookup must not hide the rest of the catalog. */ }
+          if(!loaded && selected.lookup.pid) {
+            const existing=products.findIndex(p=>p.id===selected.lookup.pid);
+            const fallback=existing>=0?products.splice(existing,1)[0]:{image:'',supplierPrice:'',listings:0,hasVideo:false};
+            products.unshift({...fallback,...selected,id:selected.lookup.pid});
+          }
         }
         const value = {products,updatedAt:new Date(now()).toISOString()};
         cache.set(slug,{value,expires:now()+6*3600000});
@@ -86,7 +93,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
     pending.set(key,task); return task;
   }
   async function detail(slug,id) {
-    const product=(await list(slug)).products.find(p=>p.id===id);
+    const product=selectedProducts.find(p=>p.category===slug && p.lookup.pid===id) || (await list(slug)).products.find(p=>p.id===id);
     if(!product) throw new Error('Unknown product');
     return cached('detail:'+id,5*60000,async()=>{
       const access=await authenticate();

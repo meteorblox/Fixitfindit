@@ -3,9 +3,18 @@ import assert from 'node:assert/strict';
 import {createCheckout} from './checkout.mjs';
 import {checkoutItem,createProductCheckoutRoute} from './product-checkout.mjs';
 import {Readable} from 'node:stream';
+import {createCatalog} from './catalog.mjs';
 
 const vid='1696373349854752768';
 const catalog={detail:async()=>({variants:[{id:vid,price:190,stock:10}]})};
+test('approved variant lookup works independently of category search',async()=>{
+  const supplier=createCatalog({apiKey:'test',interval:0,request:async(url)=>{
+    assert.ok(!url.includes('/listV2'));
+    const data=url.includes('getAccessToken')?{accessToken:'test'}:url.includes('getInventoryByPid')?{variantInventories:[{vid,inventory:[{countryCode:'CN',totalInventory:5}]}]}:{variants:[{vid,variantKey:'Black-1PC',variantSellPrice:1.90}]};
+    return {ok:true,json:async()=>({result:true,data})};
+  }});
+  assert.equal((await checkoutItem(supplier,vid)).retailCents,1700);
+});
 test('only approved exact single variants with stock can enter checkout',async()=>{
   const item=await checkoutItem(catalog,vid);
   assert.equal(item.retailCents,1700);
