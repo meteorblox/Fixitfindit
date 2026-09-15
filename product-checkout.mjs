@@ -47,7 +47,7 @@ export function createProductCheckoutRoute({catalog,checkout=createCheckout()}={
       } else if(url.pathname==='/checkout/products/result' && req.method==='GET') {
         if(!reference) {page(400,'Test cookie missing. Start another product test.');return true;}
         const result=await checkout.verifyProduct(url.searchParams.get('session_id'),reference);
-        page(200,result.paid?`Stripe confirmed the ${usd(result.retailCents)} product test payment. ${result.orderId?'Order '+result.orderId+' is saved in FixItFindIt.':'The exact product and variant are recorded in Stripe.'} Nothing will ship.`:'Payment is not confirmed yet. Refresh to check again.');
+        page(200,result.paid?`Stripe confirmed the ${usd(result.retailCents)} product test payment. ${result.orderId?'Order '+result.orderId+' is saved in FixItFindIt.':'The exact product and variant are recorded in Stripe.'} ${result.webhookReceived?'Automatic Stripe notification received and recorded.':'Automatic notification has not been recorded yet; refresh to check.'} Nothing will ship.`:'Payment is not confirmed yet. Refresh to check again.');
       } else page(405,'This checkout action is unavailable.');
     } catch {page(503,'The product test could not be started or verified. Please start another test.');}
     return true;

@@ -14,9 +14,11 @@ test('orders survive a database reopen, preserve snapshots and deduplicate notif
   const path=join(mkdtempSync(join(tmpdir(),'fixit-orders-')),'test.sqlite');
   let db=createOrderStore(path);
   const row=db.prepare('owner',item);
+  assert.equal(db.hasWebhook(row.id),false);
   assert.equal(db.prepare('owner',item).id,row.id);
   assert.throws(()=>db.prepare('owner',{...item,retailCents:100}));
   db.recordSession(session(row),'evt_example');
+  assert.equal(db.hasWebhook(row.id),true);
   db.recordSession(session(row),'evt_example');
   db.close();db=createOrderStore(path);
   assert.equal(db.get(row.id).status,'paid_sandbox');

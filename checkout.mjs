@@ -48,7 +48,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
       const m=s.metadata||{};
       if(s.client_reference_id!==reference || m.purpose!=='fixitfindit-product-sandbox' || m.fulfillment!=='sandbox-do-not-ship' || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.amount_total!==Number(m.retail_cents) || s.currency!=='usd') throw new Error('Product payment could not be verified.');
       if(m.order_id) {if(!orders) throw new Error('Order storage unavailable');orders.recordSession(s);}
-      return {paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),orderId:m.order_id||null};
+      return {paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
     },
     async start(origin, reference) {
       const session = await call('', {
