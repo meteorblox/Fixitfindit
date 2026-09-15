@@ -1,3 +1,4 @@
+import {infoPages,infoPage,infoFooter} from './info-pages.mjs';
 import {partnerStore} from './partner-applications.mjs';
 import {applicationRoute} from './partner-application-route.mjs';
 import http from 'node:http';
@@ -49,6 +50,7 @@ export function renderStore(store) {
     .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home.')
     .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
     .replace('href="#organize"','href="'+prefix+'/category/organization"');
+  html = html.replace('<div class="copyright shell">',infoFooter+'<div class="copyright shell">');
   if (!store) return html;
   const name = escape(store.name);
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
@@ -82,6 +84,7 @@ export const server = http.createServer(async (req, res) => {
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
     if (path === '/partners' || path === '/partners/') return send(200,'text/html',partnerPage(renderStore()));
+    if (infoPages[path]) return send(200,'text/html',infoPage(renderStore(),infoPages[path]));
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
     if (path === '/' || path === '/index.html') return send(200, 'text/html', await renderHome());
