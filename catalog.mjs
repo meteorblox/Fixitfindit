@@ -1,3 +1,4 @@
+import {selectedProducts} from './selected-products.mjs';
 export const categories = [
   {slug:'kitchen',name:'Kitchen',query:'kitchen'},
   {slug:'cleaning',name:'Cleaning',query:'cleaning brush'},
@@ -52,6 +53,15 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
           supplierPrice:String(p.sellPrice ?? ''),listings:Number(p.listedNum) || 0,
           hasVideo:p.isVideo === 1,category:slug
         }));
+        for(const selected of selectedProducts.filter(p=>p.category===slug)) {
+          try {
+            const item=await call('/product/query?'+new URLSearchParams(selected.lookup),{headers:{'CJ-Access-Token':access}});
+            if(!item?.pid) continue;
+            const existing=products.findIndex(p=>p.id===String(item.pid));
+            if(existing>=0) products.splice(existing,1);
+            products.unshift({...selected,id:String(item.pid),image:safeImage(item.bigImage || item.productImage),supplierPrice:String(item.sellPrice??''),listings:Number(item.listedNum)||0,hasVideo:false});
+          } catch { /* A selected product lookup must not hide the rest of the catalog. */ }
+        }
         const value = {products,updatedAt:new Date(now()).toISOString()};
         cache.set(slug,{value,expires:now()+6*3600000});
         return value;
@@ -76,25 +86,27 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
     pending.set(key,task); return task;
   }
   async function detail(slug,id) {
-    if(!(await list(slug)).products.some(p=>p.id===id)) throw new Error('Unknown product');
+    const product=(await list(slug)).products.find(p=>p.id===id);
+    if(!product) throw new Error('Unknown product');
     return cached('detail:'+id,5*60000,async()=>{
       const access=await authenticate();
-      const data=await call('/product/query?'+new URLSearchParams({pid:id,countryCode:'US'}),{headers:{'CJ-Access-Token':access}});
+      const data=await call('/product/query?'+new URLSearchParams({pid:id,countryCode:product.origin||'US'}),{headers:{'CJ-Access-Token':access}});
       if(!Array.isArray(data?.variants)) throw new Error('Invalid product details');
       const inventory=await call('/product/stock/getInventoryByPid?'+new URLSearchParams({pid:id}),{headers:{'CJ-Access-Token':access}});
       if(!Array.isArray(inventory?.variantInventories)) throw new Error('Variant inventory is unavailable');
-      return {variants:data.variants.filter(v=>v.vid).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:usStock(inventory.variantInventories,v.vid)}))};
+      return {origin:product.origin||'US',variants:data.variants.filter(v=>v.vid).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:usStock(inventory.variantInventories,v.vid,product.origin||'US')}))};
     });
   }
   async function shipping(slug,id,vid,zip,quantity=1) {
     if(!/^\d{5}$/.test(zip) || !Number.isInteger(quantity) || quantity<1 || quantity>10) throw new Error('Enter a five-digit US ZIP code and quantity from 1 to 10.');
-    const variant=(await detail(slug,id)).variants.find(v=>v.id===vid);
-    if(!variant || variant.stock<quantity || variant.price===null) throw new Error('This option does not have confirmed US stock for that quantity.');
+    const details=await detail(slug,id);
+    const variant=details.variants.find(v=>v.id===vid);
+    if(!variant || variant.stock<quantity || variant.price===null) throw new Error('This option does not have confirmed stock for that quantity.');
     // Bound the quote cache so arbitrary ZIP codes cannot grow memory indefinitely.
     if(cache.size>500) for(const key of cache.keys()) if(key.startsWith('ship:')) cache.delete(key);
     return cached(`ship:${vid}:${zip}:${quantity}`,60000,async()=>{
       const access=await authenticate();
-      const data=await call('/logistic/freightCalculate',{method:'POST',headers:{'CJ-Access-Token':access,'Content-Type':'application/json'},body:JSON.stringify({startCountryCode:'US',endCountryCode:'US',zip,products:[{vid,quantity}]})});
+      const data=await call('/logistic/freightCalculate',{method:'POST',headers:{'CJ-Access-Token':access,'Content-Type':'application/json'},body:JSON.stringify({startCountryCode:details.origin,endCountryCode:'US',zip,products:[{vid,quantity}]})});
       if(!Array.isArray(data)) throw new Error('Invalid shipping response');
       return data.map(r=>({name:String(r.logisticName || 'Shipping'),days:String(r.logisticAging || 'Unavailable'),price:money(r.logisticPrice)})).filter(r=>r.price!==null).sort((a,b)=>a.price-b.price);
     });
@@ -102,10 +114,10 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
   return {list,detail,shipping};
 }
 export function money(value) { if(value===null || value===undefined || value==='') return null; const n=Number(value); return Number.isFinite(n)&&n>=0?Math.round(n*100):null; }
-export function usStock(rows,vid) {
+export function usStock(rows,vid,country='US') {
   const row=rows.find(r=>String(r.vid)===String(vid));
   if(!Array.isArray(row?.inventory)) return null;
-  const us=row.inventory.filter(i=>i.countryCode==='US');
+  const us=row.inventory.filter(i=>i.countryCode===country);
   if(us.some(i=>i.totalInventory===null || i.totalInventory===undefined || !Number.isFinite(Number(i.totalInventory)))) return null;
   return us.reduce((sum,i)=>sum+Math.max(0,Math.floor(Number(i.totalInventory))),0);
 }
