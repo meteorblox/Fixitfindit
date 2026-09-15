@@ -1,3 +1,5 @@
+import {partnerStore} from './partner-applications.mjs';
+import {applicationRoute} from './partner-application-route.mjs';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +74,7 @@ export const server = http.createServer(async (req, res) => {
       'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin'});
     res.end(req.method === 'HEAD' ? undefined : body);
   };
+  if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await webhookRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productCheckoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
@@ -84,7 +87,7 @@ export const server = http.createServer(async (req, res) => {
     if (path === '/' || path === '/index.html') return send(200, 'text/html', await renderHome());
     const route = path.match(/^(?:\/shop\/([a-z0-9-]+))?\/category\/([a-z0-9-]+)(?:\/product\/([a-zA-Z0-9-]+))?\/?$/);
     if (route) {
-      const store = route[1] ? stores.find(s=>s.slug===route[1]) : undefined;
+      const store = route[1] ? (stores.find(s=>s.slug===route[1]) || partnerStore?.find(route[1])) : undefined;
       const category = categories.find(c=>c.slug===route[2]);
       if ((route[1] && !store) || !category) return send(404,'text/plain','Store or category not found');
       let data, error;
@@ -110,7 +113,7 @@ export const server = http.createServer(async (req, res) => {
     }
     const match = path.match(/^\/shop\/([a-z0-9-]+)\/?$/);
     if (match) {
-      const store = stores.find(s => s.slug === match[1]);
+      const store = (stores.find(s => s.slug === match[1]) || partnerStore?.find(match[1]));
       if (store) return send(200, 'text/html', await renderHome(store));
     }
     return send(404, 'text/plain', 'Store or page not found');
