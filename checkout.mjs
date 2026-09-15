@@ -27,6 +27,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
         'line_items[0][price_data][currency]':'usd',
         'line_items[0][price_data][unit_amount]':String(item.retailCents),
         'line_items[0][price_data][tax_behavior]':'exclusive',
+        'line_items[0][price_data][product_data][tax_code]':'txcd_99999999',
         'automatic_tax[enabled]':'true',
         'metadata[tax_mode]':'automatic',
         'line_items[0][price_data][product_data][name]':item.name+' — SANDBOX, no shipment',
