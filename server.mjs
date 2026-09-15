@@ -9,7 +9,9 @@ import { homeProducts } from './home-products.mjs';
 import { partnerPage } from './partners.mjs';
 import { checkoutRoute } from './checkout.mjs';
 import { productOptions } from './product-options.mjs';
+import { createProductCheckoutRoute } from './product-checkout.mjs';
 const catalog = createCatalog();
+const productCheckoutRoute = createProductCheckoutRoute({catalog});
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const template = await readFile(new URL('index.html', import.meta.url), 'utf8');
@@ -69,6 +71,7 @@ export const server = http.createServer(async (req, res) => {
     res.end(req.method === 'HEAD' ? undefined : body);
   };
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
+  if (await productCheckoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
@@ -95,6 +98,7 @@ export const server = http.createServer(async (req, res) => {
           catch(e) { options.shippingError=e.message; }
         }
         page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
+        if(!store && product.pricedVariants?.length) page=page.replace('<strong>Not available to purchase yet</strong>','<p><a href="/checkout/products">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>');
       }
       return send(error?503:200,'text/html',page);
     }

@@ -16,6 +16,34 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
   }
   return {
     enabled,
+    async startProduct(origin, reference, item) {
+      if (!Number.isInteger(item.retailCents) || item.retailCents < 1 || !item.variantId || !item.productId) throw new Error('Invalid product selection.');
+      const session = await call('', {
+        mode:'payment','payment_method_types[0]':'card',
+        'line_items[0][price_data][currency]':'usd',
+        'line_items[0][price_data][unit_amount]':String(item.retailCents),
+        'line_items[0][price_data][product_data][name]':item.name+' — SANDBOX, no shipment',
+        'line_items[0][quantity]':'1',
+        'shipping_address_collection[allowed_countries][0]':'US',
+        'metadata[purpose]':'fixitfindit-product-sandbox',
+        'metadata[product_id]':item.productId,'metadata[variant_id]':item.variantId,
+        'metadata[retail_cents]':String(item.retailCents),'metadata[quantity]':'1',
+        'metadata[store_id]':'fixitfindit','metadata[fulfillment]':'sandbox-do-not-ship',
+        'custom_text[submit][message]':'Test only. No shipment or commission. Tax is not calculated in this test.',
+        client_reference_id:reference,
+        success_url:origin+'/checkout/products/result?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url:origin+'/checkout/products?cancelled=1'
+      },reference+':'+item.variantId);
+      if (!session.url?.startsWith('https://checkout.stripe.com/')) throw new Error('Invalid checkout destination.');
+      return session.url;
+    },
+    async verifyProduct(id, reference) {
+      if (!/^cs_test_[a-zA-Z0-9]+$/.test(id || '')) throw new Error('Invalid test session.');
+      const s=await call('/'+id);
+      const m=s.metadata||{};
+      if(s.client_reference_id!==reference || m.purpose!=='fixitfindit-product-sandbox' || m.fulfillment!=='sandbox-do-not-ship' || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.amount_total!==Number(m.retail_cents) || s.currency!=='usd') throw new Error('Product payment could not be verified.');
+      return {paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents)};
+    },
     async start(origin, reference) {
       const session = await call('', {
         mode:'payment', 'payment_method_types[0]':'card',
