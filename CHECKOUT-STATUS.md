@@ -23,6 +23,8 @@ All payment creation rejects live credentials. Live purchases must remain disabl
 
 ## Order storage and webhook configuration
 
+Railway volume `fixitfindit-volume` is mounted at `/data`, and `ORDERS_DB_PATH=/data/orders.sqlite` is configured. A fresh $17 black faucet test payment successfully saved an application order on September 15. The Stripe webhook destination/signing secret has not yet been configured; background notifications are not operational until that step is finished. All 21 automated tests pass.
+
 Attach a Railway volume at `/data` and set `ORDERS_DB_PATH=/data/orders.sqlite`. Keep one replica. The SQLite journal and database must stay together on the persistent volume. Node 22.13 or newer is required. The code never silently substitutes temporary storage. Existing test checkout remains available without a configured database, but does not claim application orders are saved.
 
 In the **Stripe sandbox**, add a webhook destination `https://www.fixitfindit.com/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`. Use snapshot events. Set the destination's signing secret in Railway as `STRIPE_WEBHOOK_SECRET` (keep it out of chat and the repository), then deploy.
