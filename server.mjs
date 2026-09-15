@@ -46,9 +46,10 @@ export function renderStore(store) {
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
     .replace('</head>', `<meta name="robots" content="noindex,nofollow"><style>:root{--orange:${store.accent}}</style></head>`)
     .replace(/<div class="notice">.*?<\/div>/, '<div class="notice">Partner storefront preview · Purchases and commissions are not enabled</div>')
-    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home"><span class="partner-mark" aria-hidden="true">${escape(store.name[0])}</span><span>${name}<small>Powered by FixItFindIt</small></span></a>`)
+    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home"><span class="partner-mark" aria-hidden="true">${escape(store.name[0])}</span><span>${name}</span></a>`)
     .replace('<h1>Small fixes.<br><em>Better home.</em></h1>', `<p class="eyebrow">${name}</p><h1>Small fixes.<br><em>Better home.</em></h1><p>${escape(store.tagline)}</p>`)
     .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b> · A FixItFindIt storefront preview`);
+  html = html.replace('<footer>', '<footer><p class="partner-powered shell">Powered by <a href="/">FixItFindIt</a></p>');
   // Demo cards keep their information, but must not imply tracked or payable purchases.
   html = html.replace(/<a href="https:\/\/www\.(?:amazon|walmart)\.com[^>]*>([\s\S]*?)<\/a>/g,
     '<span class="demo-product-link">$1</span>');
