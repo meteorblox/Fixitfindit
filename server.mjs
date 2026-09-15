@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { createCatalog, categories } from './catalog.mjs';
 import { catalogPage } from './catalog-pages.mjs';
+import { homeContent } from './home.mjs';
 const catalog = createCatalog();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -32,7 +33,10 @@ export function renderStore(store) {
     .replaceAll('href="brand.css"', 'href="/brand.css"')
     .replaceAll('src="fix-it-find-it-logo.png"', 'src="/fix-it-find-it-logo.png"');
   const prefix = store ? `/shop/${store.slug}` : '';
-  html = html.replace('<main id="top">', `<main id="top"><nav class="category-tabs shell" aria-label="Browse catalog">${categories.map(c=>`<a href="${prefix}/category/${c.slug}">${c.name}</a>`).join('')}</nav>`);
+  html = html.replace(/<main id="top">[\s\S]*?<\/main>/,homeContent(prefix))
+    .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home. · Catalog preview')
+    .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
+    .replace('href="#organize"','href="'+prefix+'/category/organization"');
   if (!store) return html;
   const name = escape(store.name);
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)

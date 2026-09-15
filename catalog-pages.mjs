@@ -10,7 +10,7 @@ export function catalogPage(shell, {store, category, data, error, product}) {
   } else if (error) content += `<div class="catalog-message" role="status">${esc(error)}</div>`;
   else if (data) content += `<p class="catalog-note">US warehouse filter · Sorted by CJ listing popularity, not verified sales. Updated ${esc(data.updatedAt)}</p><div class="grid">${data.products.length?data.products.map(card).join(''):'<p>No matching US warehouse products were returned. Try another category.</p>'}</div>`;
   else content += '<p>Select a category to browse CJ products.</p>';
-  return shell.replace(/<main id="top">[\s\S]*?<\/main>/,`<main id="top" class="shell catalog">${content}</main>`)
+  return shell.replace(/<main id="top"[^>]*>[\s\S]*?<\/main>/,`<main id="top" class="shell catalog">${content}</main>`)
     .replace('</head>','<meta name="robots" content="noindex,nofollow"></head>')
     .replace(/href="#(?:best|kitchen|organize|top)"/g,`href="${prefix || '/'}"`);
 }
