@@ -1,0 +1,10 @@
+[
+  {
+    "id": "demo-home-helper",
+    "slug": "home-helper",
+    "name": "Home Helper",
+    "tagline": "Useful finds. A happier home.",
+    "accent": "#167164",
+    "demo": true
+  }
+]
