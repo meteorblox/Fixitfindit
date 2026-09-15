@@ -50,3 +50,7 @@ Browser showed 18 listings. Ship From All and Free Shipping All; supplier ranges
 - Nordic Balcony Aisle LED Strip Ceiling Light: https://www.cjdropshipping.com/product/nordic-balcony-aisle-led-strip-ceiling-light-p-1795627166630162432.html — category range $14.04–25.21. Candidate for further specification and delivered-cost checks.
 
 No collection-wide margin assumption. Exact US-compatible variants, shipping, and competitive retail comparisons remain necessary.
+
+### Faucet cost correction — September 15
+
+User clarified silver delivered cost is $11.16. The earlier $8.47 quote must not be used for silver. At $17 retail only $5.84 remains before fees/commission, or $4.14 after a hypothetical 10% commission before processing. Withdraw the $17 silver price pending repricing. No partner commission rate is approved.
