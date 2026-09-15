@@ -9,7 +9,7 @@ export function homeContent(prefix = '') {
   ];
   return `<main id="top" class="home">
     <section class="home-hero shell">
-      <div class="home-copy"><p class="eyebrow">GOOD FINDS. EVERYDAY FIXES.</p><h1>Small fixes.<br><em>Better home.</em></h1><p class="home-lede">For the cluttered drawer. The stubborn corner. The little job you’ve been meaning to do. Find a better way to tackle everyday life.</p><div class="home-actions"><a class="primary" href="#browse">Find your next fix <span>↗</span></a><a class="text-link" href="${link('cleaning')}">Explore household finds →</a></div><p class="home-preview">Explore our growing catalog · Checkout coming soon</p></div>
+      <div class="home-copy"><p class="eyebrow">GOOD FINDS. EVERYDAY FIXES.</p><h1>Small fixes.<br><em>Better home.</em></h1><p class="home-lede">For the cluttered drawer. The stubborn corner. The little job you’ve been meaning to do. Find a better way to tackle everyday life.</p><div class="home-actions"><a class="text-link" href="${link('cleaning')}">Explore household finds →</a></div><p class="home-preview">Explore our growing catalog · Checkout coming soon</p></div>
       <div class="home-visual"><img src="/hero-products.png" alt="Kitchen and household problem-solvers arranged together"><div class="home-stamp">LESS FUSS.<br><b>More living.</b></div><a class="home-image-link" href="${link('kitchen')}"><span>START IN THE KITCHEN<br><b>Little upgrades, everyday usefulness.</b></span><span>↗</span></a></div>
     </section>
     <div class="home-values shell"><span>Household problem-solvers</span><span>Five categories to explore</span><span>A home that works for you</span></div>
