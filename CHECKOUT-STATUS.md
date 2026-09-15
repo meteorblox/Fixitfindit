@@ -12,8 +12,7 @@ A $17 silver faucet sandbox payment was completed in the browser on September 15
 
 ## Required before live sales
 
-- Persistent application order storage and authenticated order administration. Stripe metadata is not an application order database.
-- Signed Stripe webhooks with idempotent order updates, including payments where the customer never returns to the website.
+- Persistent order storage and signed Stripe webhook support are implemented; verify the production mount and connect the sandbox Stripe endpoint as described below. Authenticated order administration is still required.
 - Address-specific delivered costs including applicable supplier fees; agreed pricing and delivery limits. The current product simulation charges $0 shipping and does not calculate tax.
 - Stripe automatic-tax integration and sandbox verification. Dashboard setup alone does not enable tax in these sessions.
 - CJ fulfillment workflow, tracking and refunds; no supplier order API is called by this code.
@@ -21,3 +20,13 @@ A $17 silver faucet sandbox payment was completed in the browser on September 15
 - Partner attribution, commission rate, ledger and payouts. No partner checkout is enabled.
 
 All payment creation rejects live credentials. Live purchases must remain disabled until these tasks are complete.
+
+## Order storage and webhook configuration
+
+Attach a Railway volume at `/data` and set `ORDERS_DB_PATH=/data/orders.sqlite`. Keep one replica. The SQLite journal and database must stay together on the persistent volume. Node 22.13 or newer is required. The code never silently substitutes temporary storage. Existing test checkout remains available without a configured database, but does not claim application orders are saved.
+
+In the **Stripe sandbox**, add a webhook destination `https://www.fixitfindit.com/webhooks/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, and `checkout.session.expired`. Use snapshot events. Set the destination's signing secret in Railway as `STRIPE_WEBHOOK_SECRET` (keep it out of chat and the repository), then deploy.
+
+Until both storage and the signing secret are configured, the webhook returns 503. Invalid signatures and live events are rejected. Authenticated but irrelevant events, including legacy tests without application order IDs, are ignored. Order and event updates commit together, duplicate event IDs are ignored, and delayed events cannot reverse a paid status. Storage errors return 503 for Stripe retries.
+
+The current database saves product/price snapshots and payment status only; it does not copy contact details or card information. Shipping information remains in Stripe. Payment confirmation on return also saves the order, but webhooks must be connected to handle customers who never return. No paid state triggers fulfillment yet.

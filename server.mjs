@@ -10,8 +10,10 @@ import { partnerPage } from './partners.mjs';
 import { checkoutRoute } from './checkout.mjs';
 import { productOptions } from './product-options.mjs';
 import { createProductCheckoutRoute } from './product-checkout.mjs';
+import {createWebhookRoute} from './stripe-webhook.mjs';
 const catalog = createCatalog();
 const productCheckoutRoute = createProductCheckoutRoute({catalog});
+const webhookRoute=createWebhookRoute();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const template = await readFile(new URL('index.html', import.meta.url), 'utf8');
@@ -71,6 +73,7 @@ export const server = http.createServer(async (req, res) => {
     res.end(req.method === 'HEAD' ? undefined : body);
   };
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
+  if (await webhookRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productCheckoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
