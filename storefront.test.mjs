@@ -7,7 +7,7 @@ after(() => server.close());
 test('partner storefront shares products and changes branding', async () => {
   const original = await (await fetch(base)).text();
   const partner = await (await fetch(base + '/shop/home-helper')).text();
-  for (const product of ['Silicone Stove-Gap Covers', 'Vegetable Chopper', 'Pull-Out Cabinet Organizer']) {
+  for (const product of ['Cleaning', 'Organization', 'Kitchen', 'Tools', 'Home improvement']) {
     assert.ok(original.includes(product)); assert.ok(partner.includes(product));
   }
   assert.ok(partner.includes('Home Helper'));

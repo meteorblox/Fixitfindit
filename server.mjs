@@ -34,6 +34,7 @@ export function renderStore(store) {
     .replaceAll('src="fix-it-find-it-logo.png"', 'src="/fix-it-find-it-logo.png"');
   const prefix = store ? `/shop/${store.slug}` : '';
   html = html.replace(/<main id="top">[\s\S]*?<\/main>/,homeContent(prefix))
+    .replaceAll('href="#best"', 'href="#browse"').replace('Best finds','Browse categories').replace('See the fixes','Explore the catalog')
     .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home. · Catalog preview')
     .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
     .replace('href="#organize"','href="'+prefix+'/category/organization"');

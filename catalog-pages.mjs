@@ -12,5 +12,5 @@ export function catalogPage(shell, {store, category, data, error, product}) {
   else content += '<p>Select a category to browse CJ products.</p>';
   return shell.replace(/<main id="top"[^>]*>[\s\S]*?<\/main>/,`<main id="top" class="shell catalog">${content}</main>`)
     .replace('</head>','<meta name="robots" content="noindex,nofollow"></head>')
-    .replace(/href="#(?:best|kitchen|organize|top)"/g,`href="${prefix || '/'}"`);
+    .replace(/href="#(?:best|browse|kitchen|organize|top)"/g,`href="${prefix || '/'}"`);
 }
