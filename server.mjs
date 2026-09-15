@@ -8,6 +8,7 @@ import { homeContent } from './home.mjs';
 import { homeProducts } from './home-products.mjs';
 import { partnerPage } from './partners.mjs';
 import { checkoutRoute } from './checkout.mjs';
+import { productOptions } from './product-options.mjs';
 const catalog = createCatalog();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -84,7 +85,18 @@ export const server = http.createServer(async (req, res) => {
       try { data = await catalog.list(category.slug); } catch(e) { error = e.message; }
       const product = route[3] ? data?.products.find(p=>p.id===route[3]) : undefined;
       if (route[3] && !product && !error) return send(404,'text/plain','Product not found');
-      return send(error?503:200,'text/html',catalogPage(renderStore(store),{store,category,data,error,product}));
+      let page=catalogPage(renderStore(store),{store,category,data,error,product});
+      if(product) {
+        const params=new URL(req.url,'http://localhost').searchParams;
+        const options={vid:params.get('variant')||'',zip:params.get('zip')||'',quantity:Number(params.get('quantity')||1)};
+        try { options.details=await catalog.detail(category.slug,product.id); } catch { options.detailError='Product options are temporarily unavailable. Please try again later.'; }
+        if(options.details && params.has('zip')) {
+          try { options.shipping=await catalog.shipping(category.slug,product.id,options.vid,options.zip,options.quantity); }
+          catch(e) { options.shippingError=e.message; }
+        }
+        page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
+      }
+      return send(error?503:200,'text/html',page);
     }
     const match = path.match(/^\/shop\/([a-z0-9-]+)\/?$/);
     if (match) {

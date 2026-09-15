@@ -56,3 +56,4 @@
 
 footer>.partner-powered{display:block;padding-bottom:0}
 
+.product-options{margin:24px 0;padding:20px;background:#f1f5ef;border-radius:14px}.product-options label{display:block;font-weight:600;font-size:14px}.product-options select,.product-options input{display:block;box-sizing:border-box;width:100%;padding:12px;margin:8px 0 16px;border:1px solid #b9c8be;border-radius:7px;background:white;color:#173c35}.product-options select{max-width:100%;white-space:normal}.shipping-fields{display:grid;grid-template-columns:2fr 1fr;gap:16px}.product-options button{background:#216653;color:white;border:0;border-radius:8px;padding:12px 20px;cursor:pointer;font:inherit}.catalog-detail>div{min-width:0}
