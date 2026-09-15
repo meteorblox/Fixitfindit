@@ -40,3 +40,6 @@
 @media(max-width:900px){.home-hero{grid-template-columns:1fr}.home-copy{padding:35px}.home-visual{min-height:340px}.home-categories{grid-template-columns:repeat(3,1fr)}.home-feature{gap:25px;padding:30px}.home-heading{display:block}.home-ideas{gap:12px}.home-ideas>a>div{padding:18px}}
 @media(max-width:600px){.home-copy{padding:30px 23px}.home-hero{margin-top:10px;border-radius:16px}.home-values{flex-direction:column;gap:8px;text-align:center}.home-section{padding-block:45px}.home-categories{grid-template-columns:1fr 1fr}.home-tile:last-child{grid-column:1/-1}.home-icon{margin:16px 0}.home-feature,.home-discovery,.home-ideas,.home-how>div{grid-template-columns:1fr}.home-feature,.home-discovery{padding:25px}.home-partner-space{border-left:0;border-top:1px solid #d8d9ca;padding:25px 0 0}.home-stamp{width:85px;height:85px}.home-image-link{left:14px;right:14px;bottom:14px}.home-image-link b{font-size:.8rem}}
 @media(prefers-reduced-motion:reduce){.home-tile{transition:none}.home-tile:hover{transform:none}}
+
+.home-tile-top{justify-content:flex-end}
+
