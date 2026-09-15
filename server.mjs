@@ -6,6 +6,7 @@ import { createCatalog, categories } from './catalog.mjs';
 import { catalogPage } from './catalog-pages.mjs';
 import { homeContent } from './home.mjs';
 import { homeProducts } from './home-products.mjs';
+import { partnerPage } from './partners.mjs';
 const catalog = createCatalog();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -67,6 +68,7 @@ export const server = http.createServer(async (req, res) => {
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
+    if (path === '/partners' || path === '/partners/') return send(200,'text/html',partnerPage(renderStore()));
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
     if (path === '/' || path === '/index.html') return send(200, 'text/html', await renderHome());
