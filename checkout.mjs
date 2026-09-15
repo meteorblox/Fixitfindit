@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {orders as defaultOrders} from './orders.mjs';
+import {paymentTotals} from './payment-totals.mjs';
 
 export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = fetch,orders=defaultOrders} = {}) {
   const enabled = () => typeof key === 'string' && key.startsWith('sk_test_');
@@ -20,11 +21,14 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
     async startProduct(origin, reference, item) {
       if(!enabled()) throw new Error('Sandbox checkout is not configured.');
       if (!Number.isInteger(item.retailCents) || item.retailCents < 1 || !item.variantId || !item.productId) throw new Error('Invalid product selection.');
-      const order=orders?.prepare(reference,item);
+      const order=orders?.prepare(reference,{...item,automaticTax:true});
       const session = await call('', {
         mode:'payment','payment_method_types[0]':'card',
         'line_items[0][price_data][currency]':'usd',
         'line_items[0][price_data][unit_amount]':String(item.retailCents),
+        'line_items[0][price_data][tax_behavior]':'exclusive',
+        'automatic_tax[enabled]':'true',
+        'metadata[tax_mode]':'automatic',
         'line_items[0][price_data][product_data][name]':item.name+' — SANDBOX, no shipment',
         'line_items[0][quantity]':'1',
         'shipping_address_collection[allowed_countries][0]':'US',
@@ -33,7 +37,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
         'metadata[retail_cents]':String(item.retailCents),'metadata[quantity]':'1',
         'metadata[store_id]':'fixitfindit','metadata[fulfillment]':'sandbox-do-not-ship',
         ...(order?{'metadata[order_id]':order.id}:{}),
-        'custom_text[submit][message]':'Test only. No shipment or commission. Tax is not calculated in this test.',
+        'custom_text[submit][message]':'Test only. No shipment or commission. Applicable tax is calculated from the shipping address.',
         client_reference_id:reference,
         success_url:origin+'/checkout/products/result?session_id={CHECKOUT_SESSION_ID}',
         cancel_url:origin+'/checkout/products?cancelled=1'
@@ -46,9 +50,10 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
       if (!/^cs_test_[a-zA-Z0-9]+$/.test(id || '')) throw new Error('Invalid test session.');
       const s=await call('/'+id);
       const m=s.metadata||{};
-      if(s.client_reference_id!==reference || m.purpose!=='fixitfindit-product-sandbox' || m.fulfillment!=='sandbox-do-not-ship' || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.amount_total!==Number(m.retail_cents) || s.currency!=='usd') throw new Error('Product payment could not be verified.');
+      if(s.client_reference_id!==reference || m.purpose!=='fixitfindit-product-sandbox' || m.fulfillment!=='sandbox-do-not-ship' || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.currency!=='usd') throw new Error('Product payment could not be verified.');
+      const totals=paymentTotals(s,Number(m.retail_cents),m.tax_mode==='automatic');
       if(m.order_id) {if(!orders) throw new Error('Order storage unavailable');orders.recordSession(s);}
-      return {paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
+      return {paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),...totals,orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
     },
     async start(origin, reference) {
       const session = await call('', {
