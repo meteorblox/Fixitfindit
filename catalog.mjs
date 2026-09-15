@@ -16,7 +16,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       const response = await request(base + path, {...options, signal:AbortSignal.timeout(15000)});
       if (!response.ok) throw new Error('CJ is temporarily unavailable. Please try again later.');
       const data = await response.json();
-      if (data.result !== true) throw new Error('CJ could not load the catalog. Check account access and API quota.');
+      if (data.result !== true && !(path.startsWith('/product/stock/getInventoryByPid?') && data.success === true && data.result !== false)) throw new Error('CJ could not load the catalog. Check account access and API quota.');
       return data.data;
     });
     queue = task.catch(() => {});
@@ -81,7 +81,9 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       const access=await authenticate();
       const data=await call('/product/query?'+new URLSearchParams({pid:id,countryCode:'US'}),{headers:{'CJ-Access-Token':access}});
       if(!Array.isArray(data?.variants)) throw new Error('Invalid product details');
-      return {variants:data.variants.filter(v=>v.vid).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:(v.inventories || []).filter(i=>i.countryCode==='US').reduce((sum,i)=>sum+Math.max(0,Number(i.totalInventory)||0),0)}))};
+      const inventory=await call('/product/stock/getInventoryByPid?'+new URLSearchParams({pid:id}),{headers:{'CJ-Access-Token':access}});
+      if(!Array.isArray(inventory?.variantInventories)) throw new Error('Variant inventory is unavailable');
+      return {variants:data.variants.filter(v=>v.vid).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:usStock(inventory.variantInventories,v.vid)}))};
     });
   }
   async function shipping(slug,id,vid,zip,quantity=1) {
@@ -100,6 +102,13 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
   return {list,detail,shipping};
 }
 export function money(value) { if(value===null || value===undefined || value==='') return null; const n=Number(value); return Number.isFinite(n)&&n>=0?Math.round(n*100):null; }
+export function usStock(rows,vid) {
+  const row=rows.find(r=>String(r.vid)===String(vid));
+  if(!Array.isArray(row?.inventory)) return null;
+  const us=row.inventory.filter(i=>i.countryCode==='US');
+  if(us.some(i=>i.totalInventory===null || i.totalInventory===undefined || !Number.isFinite(Number(i.totalInventory)))) return null;
+  return us.reduce((sum,i)=>sum+Math.max(0,Math.floor(Number(i.totalInventory))),0);
+}
 export function safeImage(value) {
   try { const url = new URL(value); return url.protocol === 'https:' ? url.href : ''; } catch { return ''; }
 }
