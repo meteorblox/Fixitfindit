@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { createCatalog, categories } from './catalog.mjs';
 import { catalogPage } from './catalog-pages.mjs';
 import { homeContent } from './home.mjs';
+import { homeProducts } from './home-products.mjs';
 const catalog = createCatalog();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -52,6 +53,10 @@ export function renderStore(store) {
   return html;
 }
 
+async function renderHome(store) {
+  const products = await homeProducts(catalog, store ? `/shop/${store.slug}` : '');
+  return renderStore(store).replace('</main>',`${products}</main>`);
+}
 export const server = http.createServer(async (req, res) => {
   const send = (status, type, body) => {
     res.writeHead(status, {'Content-Type': `${type}${type.startsWith('text/') ? '; charset=utf-8' : ''}`,
@@ -63,7 +68,7 @@ export const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname;
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
-    if (path === '/' || path === '/index.html') return send(200, 'text/html', renderStore());
+    if (path === '/' || path === '/index.html') return send(200, 'text/html', await renderHome());
     const route = path.match(/^(?:\/shop\/([a-z0-9-]+))?\/category\/([a-z0-9-]+)(?:\/product\/([a-zA-Z0-9-]+))?\/?$/);
     if (route) {
       const store = route[1] ? stores.find(s=>s.slug===route[1]) : undefined;
@@ -78,7 +83,7 @@ export const server = http.createServer(async (req, res) => {
     const match = path.match(/^\/shop\/([a-z0-9-]+)\/?$/);
     if (match) {
       const store = stores.find(s => s.slug === match[1]);
-      if (store) return send(200, 'text/html', renderStore(store));
+      if (store) return send(200, 'text/html', await renderHome(store));
     }
     return send(404, 'text/plain', 'Store or page not found');
   } catch {
