@@ -7,6 +7,7 @@ import { catalogPage } from './catalog-pages.mjs';
 import { homeContent } from './home.mjs';
 import { homeProducts } from './home-products.mjs';
 import { partnerPage } from './partners.mjs';
+import { checkoutRoute } from './checkout.mjs';
 const catalog = createCatalog();
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -66,6 +67,7 @@ export const server = http.createServer(async (req, res) => {
       'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin'});
     res.end(req.method === 'HEAD' ? undefined : body);
   };
+  if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
