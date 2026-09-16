@@ -20,6 +20,6 @@ export async function previewFulfillment({order,hasWebhook,catalog,zip}) {
     retailCents:order.retail_cents,taxCents:order.tax_cents,totalCents:order.total_cents,
     supplierUnitCents:actual.price,stock:actual.stock,
     shippingOptions:options.map(o=>({...o,productPlusBaseShippingCents:actual.price+o.price})),
-    blockers:['Sandbox orders must never ship.','Shipping figures exclude unverified supplier fees and are not final delivered costs.','Recipient address, supplier order submission, tracking and refund handling are not implemented.']
+    blockers:['Sandbox orders must never ship.','Shipping figures exclude unverified supplier fees and are not final delivered costs.','Live supplier ordering and refunds remain disabled. Sandbox submission and tracking use the separate fulfillment CLI.']
   };
 }
