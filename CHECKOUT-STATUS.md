@@ -10,9 +10,9 @@ The chosen quote snapshots the exact variant, product price, supplier unit cost,
 
 CJ `totalPostageFee` is used when valid; otherwise explicit base postage plus taxes/customs-clearance fees can form the estimate. If fees are missing, sandbox checkout explicitly labels the amount as base postage only. These estimates are not confirmation of final supplier charges. ZIP quotes are not full-address quotes. Stripe's hosted address can change after the quote: the implementation detects this after payment; a live flow must prevent or resolve this before fulfillment. The shipping quote expires for session creation, but the resulting Stripe session can remain open longer; live checkout needs quote/session expiry coordination and a final cost/stock check.
 
-Validation: `npm test` passes 30 tests, including quote persistence/expiry/ownership, fee accounting, amount tampering, stock loss, Stripe shipping totals and address mismatches. All external CJ/Stripe responses in automated tests are fixtures. A deployed sandbox run against the configured accounts is still required.
+Validation: `npm test` passes 37 tests, including quote persistence/expiry/ownership, fee accounting, amount tampering, stock loss, Stripe shipping totals and address mismatches. All external CJ/Stripe responses in automated tests are fixtures. A deployed sandbox run against the configured accounts is still required.
 
-Remaining step 1 work: verify account configuration and real supplier charges; full-address delivered pricing; authenticated order operations; durable CJ submission/payment with duplicate prevention and reconciliation; tracking; refund handling; and a controlled end-to-end test. Live checkout and supplier ordering remain disabled. Affiliate attribution and commissions are separate work; the agreed future commission is 5% of product subtotal after discounts, excluding shipping and tax.
+Remaining step 1 work: verify account configuration and real supplier charges; full-address delivered pricing; authenticated order operations; production CJ submission/payment and tracking verification; refund handling; and a controlled end-to-end test. Live checkout and real supplier ordering remain disabled. Sandbox submission and tracking are implemented through a private operator CLI; see FULFILLMENT.md. Affiliate attribution and commissions are separate work; the agreed future commission is 5% of product subtotal after discounts, excluding shipping and tax.
 
 ## Deployed sandbox flow
 
@@ -27,7 +27,7 @@ A $17 silver faucet sandbox payment was completed in the browser on September 15
 - Persistent order storage and signed Stripe webhook support are implemented; verify the production mount and connect the sandbox Stripe endpoint as described below. Authenticated order administration is still required.
 - Address-specific delivered costs including applicable supplier fees; agreed pricing and delivery limits. The repository now supports ZIP-based shipping estimates in sandbox checkout; final delivered costs are not verified.
 - Stripe automatic-tax sandbox verification. The repository enables automatic tax in product sessions; dashboard configuration and a deployed test still need verification.
-- CJ fulfillment workflow, tracking and refunds; no supplier order API is called by this code.
+- Production CJ fulfillment, tracking verification and refunds. The optional operator CLI only creates CJ sandbox orders; the storefront and webhooks never call supplier mutation APIs.
 - Confirm baking pan voltage and other unresolved product specifications before enabling real ordering.
 - Partner attribution, commission rate, ledger and payouts. No partner checkout is enabled.
 
@@ -43,4 +43,4 @@ In the **Stripe sandbox**, add a webhook destination `https://www.fixitfindit.co
 
 Until both storage and the signing secret are configured, the webhook returns 503. Invalid signatures and live events are rejected. Authenticated but irrelevant events, including legacy tests without application order IDs, are ignored. Order and event updates commit together, duplicate event IDs are ignored, and delayed events cannot reverse a paid status. Storage errors return 503 for Stripe retries.
 
-The current database saves product/price snapshots and payment status only; it does not copy contact details or card information. Shipping information remains in Stripe. Payment confirmation on return also saves the order, but webhooks must be connected to handle customers who never return. No paid state triggers fulfillment yet.
+The database saves product/price snapshots, payment status and private test recipient details in the sandbox fulfillment queue. No card information is copied. Payment confirmation on return saves the order; only a signed successful-payment webhook can enqueue a sandbox fulfillment job. Queue insertion and payment/event records commit atomically. Recipient or ZIP problems produce a blocked job while preserving the paid record. A private operator CLI can submit, reconcile, simulate payment and refresh sandbox tracking after deployment and explicit sandbox configuration; there is no automatic supplier worker or public fulfillment endpoint.

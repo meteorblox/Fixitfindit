@@ -3,6 +3,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {mkdirSync} from 'node:fs';
 import {dirname,isAbsolute} from 'node:path';
 import {paymentTotals} from './payment-totals.mjs';
+import {fulfillmentStore} from './fulfillment-store.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 export function createOrderStore(path) {
@@ -18,6 +19,7 @@ export function createOrderStore(path) {
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, received_at TEXT NOT NULL);`);
   const columns=new Set(db.prepare('PRAGMA table_info(orders)').all().map(c=>c.name));
+  const fulfillment=fulfillmentStore(db);
   for(const [name,type] of [['automatic_tax','INTEGER NOT NULL DEFAULT 0'],['tax_cents','INTEGER'],['total_cents','INTEGER'],['shipping_cents','INTEGER NOT NULL DEFAULT 0'],['shipping_snapshot','TEXT'],['shipping_address_matches','INTEGER']]) if(!columns.has(name)) db.exec(`ALTER TABLE orders ADD COLUMN ${name} ${type}`);
   function prepare(reference,item) {
     if(!reference || !item.productId || !item.variantId || !Number.isSafeInteger(item.retailCents) || item.retailCents<1) throw new Error('Invalid order.');
@@ -51,11 +53,14 @@ export function createOrderStore(path) {
       }
       if(row.status!=='paid_sandbox') db.prepare('UPDATE orders SET tax_cents=COALESCE(?,tax_cents),total_cents=COALESCE(?,total_cents) WHERE id=?').run(totals.taxCents,totals.totalCents,row.id);
       if(eventId) db.prepare('INSERT INTO stripe_events VALUES (?,?,?)').run(eventId,row.id,new Date().toISOString());
+      if(eventId && ['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(eventType) && s.status==='complete' && s.payment_status==='paid') {
+        fulfillment.enqueue({...row,status},s);
+      }
       db.exec('COMMIT');
       return {id:row.id,status};
     } catch(error) {db.exec('ROLLBACK');throw error;}
   }
-  return {prepare,recordSession,get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
+  return {prepare,recordSession,fulfillment,get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
 }
 
 // No temporary disk fallback: without a configured mount, existing sandbox

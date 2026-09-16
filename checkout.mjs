@@ -69,7 +69,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
       const address=s.collected_information?.shipping_details?.address||s.shipping_details?.address;
       const destinationMatches=!m.shipping_zip || (address?.country==='US' && address?.postal_code?.slice(0,5)===m.shipping_zip);
       if(m.order_id) {if(!orders) throw new Error('Order storage unavailable');orders.recordSession(s);}
-      return {shippingCents,destinationMatches,paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),...totals,orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
+      return {fulfillment:m.order_id?orders?.fulfillment?.summary(m.order_id):null,shippingCents,destinationMatches,paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),...totals,orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
     },
     async start(origin, reference) {
       const session = await call('', {
