@@ -1,9 +1,18 @@
+import {includedShipping} from './pricing-policy.mjs';
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=c=>'$'+(c/100).toFixed(2);
-export function productOptions({details,detailError,shipping,shippingError,vid='',zip='',quantity=1}) {
+export function productOptions({product,details,detailError,shipping,shippingError,vid='',zip='',quantity=1}) {
+  if(!product?.pricedVariants?.length) return '<p>Price and available options coming soon.</p>';
   if(detailError) return `<p role="status">${esc(detailError)}</p>`;
   if(!details) return '';
-  const variants=details.variants.filter(v=>v.stock>0 && v.price!==null);
-  if(!variants.length) return '<p>No options with confirmed stock are currently available. Please check back.</p>';
-  return `<section class="product-options"><h3>Options &amp; shipping estimate</h3><p>Ships from ${details.origin==='CN'?'China':'the US'}.</p><form method="get"><label>Product option<select name="variant" required>${variants.map(v=>`<option value="${esc(v.id)}" ${vid===v.id?'selected':''}>${esc(v.name)} · supplier ${usd(v.price)} · ${details.origin==='CN'?'China':'US'} stock ${v.stock}</option>`).join('')}</select></label><div class="shipping-fields"><label>US ZIP code<input name="zip" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="${esc(zip)}" placeholder="12345" required></label><label>Quantity<input name="quantity" type="number" min="1" max="10" value="${esc(quantity)}" required></label></div><button type="submit">Check shipping</button></form><p class="catalog-note">Your ZIP code is sent to CJ to estimate shipping. Stock and rates can change; these are supplier costs, not the final checkout total.</p>${shippingError?`<p role="status">${esc(shippingError)}</p>`:''}${shipping?`<div role="status"><h4>US shipping estimate</h4>${shipping.length?shipping.map(r=>`<p><strong>${esc(r.name)} · ${usd(r.price)}</strong><br>Carrier estimate: ${esc(r.days)} days. Processing time and tax are not included.</p>`).join(''):'<p>No shipping methods were returned for this option and ZIP code.</p>'}</div>`:''}</section>`;
+  const variants=product.pricedVariants.map(v=>({...v,actual:details.variants.find(a=>a.id===v.id)})).filter(v=>v.actual?.stock>0 && v.actual.price!==null);
+  if(!variants.length) return '<p>No options are currently available. Please check back.</p>';
+  const selected=variants.find(v=>v.id===vid)||variants[0];
+  let delivery='';
+  if(shippingError) delivery='<p role="status">Delivery availability could not be checked. Please try again.</p>';
+  else if(shipping) {
+    const method=quantity===1 && (!vid || selected.id===vid)?shipping.slice().sort((a,b)=>a.totalCents-b.totalCents).find(o=>includedShipping({retailCents:selected.retailCents,supplierCents:selected.actual.price,origin:details.origin},o,zip)):null;
+    delivery=method?`<p role="status"><strong>Standard shipping included.</strong><br>Estimated transit: ${esc(method.days)} days, plus processing time. Total before sales tax: ${usd(selected.retailCents)}.</p>`:'<p role="status">Included standard shipping is not available for this selection and ZIP.</p>';
+  }
+  return `<section class="product-options"><h3>Options &amp; delivery</h3><form method="get"><label>Product option<select name="variant" required>${variants.map(v=>`<option value="${esc(v.id)}" ${selected.id===v.id?'selected':''}>${esc(v.name)} · ${usd(v.retailCents)}</option>`).join('')}</select></label><div class="shipping-fields"><label>US ZIP code<input name="zip" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="${esc(zip)}" placeholder="12345" required></label></div><button type="submit">Check delivery</button></form><p class="catalog-note">Quantity: 1. Standard shipping included where available. Sales tax is calculated at checkout.</p>${delivery}</section>`;
 }

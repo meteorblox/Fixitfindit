@@ -100,7 +100,7 @@ export const server = http.createServer(async (req, res) => {
       let page=catalogPage(renderStore(store),{store,category,data,error,product});
       if(product) {
         const params=new URL(req.url,'http://localhost').searchParams;
-        const options={vid:params.get('variant')||'',zip:params.get('zip')||'',quantity:Number(params.get('quantity')||1)};
+        const options={product,vid:params.get('variant')||'',zip:params.get('zip')||'',quantity:Number(params.get('quantity')||1)};
         try { options.details=await catalog.detail(category.slug,product.id); } catch { options.detailError='Product options are temporarily unavailable. Please try again later.'; }
         if(options.details && params.has('zip')) {
           try { options.shipping=await catalog.shipping(category.slug,product.id,options.vid,options.zip,options.quantity); }

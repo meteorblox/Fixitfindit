@@ -19,8 +19,10 @@ test('variant quotes require catalog membership and US stock; use authoritative 
  assert.equal(money(''),null); assert.equal(money('bad'),null);
 });
 test('product options escape supplier values and do not offer unstocked options',()=>{
- const html=productOptions({details:{variants:[{id:'v1',name:'<script>',price:123,stock:2},{id:'v2',name:'sold out',price:100,stock:0}]}});
+ const html=productOptions({product:{pricedVariants:[{id:'v1',name:'<script>',retailCents:8999},{id:'v2',name:'sold out',retailCents:8999}]},details:{variants:[{id:'v1',name:'<script>',price:1095,stock:2},{id:'v2',name:'sold out',price:100,stock:0}]},vid:'v1',zip:'60601',shipping:[{name:'Carrier',price:2908,totalCents:2908,feesConfirmed:true,days:'4-7'}]});
  assert.ok(html.includes('&lt;script&gt;')); assert.ok(!html.includes('sold out'));
+ assert.ok(html.includes('$89.99'));assert.ok(html.includes('Standard shipping included.'));
+ assert.ok(!html.includes('10.95'));assert.ok(!html.includes('29.08'));assert.ok(!html.includes('supplier'));
 });
 
 test('missing inventory stays unknown and product totals are never assigned to variants',()=>{
