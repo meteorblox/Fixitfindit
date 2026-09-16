@@ -36,10 +36,17 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
     },
     async simulatePayment(id) {
       await sync(id);
-      const job=requireJob(id);
+      let job=requireJob(id);
       if(job.state!=='created') return jobs.summary(id);
+      if(['CREATED','IN_CART'].includes(job.supplier_status)) {
+        if(!jobs.claim(id,'created','confirming')) return jobs.summary(id);
+        try {await cj.confirm(job.cj_order_id);}
+        catch {jobs.error(id,'confirmation_outcome_unknown');throw new Error('Sandbox confirmation outcome is uncertain. Run sync before any further action.');}
+        await sync(id);job=requireJob(id);
+      }
+      if(job.state!=='created' || job.supplier_status!=='UNPAID') throw new Error('CJ must confirm the sandbox order is unpaid before simulated payment.');
       if(!jobs.claim(id,'created','paying')) return jobs.summary(id);
-      try {await cj.simulatePayment(job.cj_detail_order_id);}
+      try {await cj.simulatePayment(job.cj_order_id);}
       catch {jobs.error(id,'payment_outcome_unknown');throw new Error('Sandbox payment outcome is uncertain. Run sync before any further action.');}
       return sync(id);
     },
@@ -47,7 +54,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
       await sync(id);
       const job=requireJob(id);
       if(!['paid','shipped','delivered'].includes(job.state)) throw new Error('Sandbox payment must be confirmed first.');
-      await cj.simulateTracking(job.cj_detail_order_id,number);
+      await cj.simulateTracking(job.cj_order_id,number);
       return sync(id);
     }
   };

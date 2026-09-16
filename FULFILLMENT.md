@@ -1,6 +1,6 @@
 # CJ sandbox fulfillment
 
-This implements the next part of checkout testing. It does not enable live sales, spend the CJ balance, send customer emails, or ship goods. Deployment and a real-account sandbox run are still outstanding.
+This implements the next part of checkout testing. It does not enable live sales, spend the CJ balance, send customer emails, or ship goods. Railway deployment and a real-account sandbox Stripe-to-CJ payment run were verified September 16, 2026 ($17 product, $6.57 shipping, $1.79 Stripe test tax). CJ returned isSandbox=1 and UNSHIPPED after simulated payment. This is not evidence of live shipping or production tax readiness.
 
 ## Flow
 
@@ -9,7 +9,7 @@ This implements the next part of checkout testing. It does not enable live sales
 3. Missing recipient details, ZIP/country mismatch, missing quotes or unapproved variants create a blocked job. Payment remains recorded. Use a new test checkout with corrected test data; this version has no editor for blocked jobs.
 4. An operator runs the CLI in the deployed service environment. `submit` rechecks stock, atomically claims the job, and sends Create Order V2 with fixed `isSandbox=1`, `payType=3`, `orderFlow=1`, and `shopLogisticsType=2`. No live payment endpoint exists in the adapter.
 5. `sync` queries the saved CJ ID, or the stable `FITTEST-<application-order-id>` identifier when creation is uncertain. It verifies sandbox mode, custom order identity, destination country, variant and quantity before accepting state or tracking. An unknown or mismatched response requires review.
-6. `simulate-payment` uses CJ's sandbox payment endpoint only after checking identity. `simulate-tracking` sets an SBX-prefixed fake tracking number. The operator refreshes state using `sync`; this release does not schedule polling.
+6. `simulate-payment` confirms CREATED/IN_CART sandbox orders with PATCH confirmOrder, verifies UNPAID, then uses the sandbox payment endpoint. The creation shipment code is retained for mutations; the distinct detail order ID is pinned after identity validation. `simulate-tracking` sets an SBX-prefixed fake tracking number. The operator refreshes state using `sync`; this release does not schedule polling.
 7. The owning browser can refresh its Stripe result page to see sandbox status and simulated tracking. It cannot see recipient details or other customers' orders.
 
 ## Configuration and commands
@@ -31,13 +31,13 @@ CLI output excludes recipient names/addresses and credentials. The private datab
 
 ## Interrupted operations
 
-The `creating` and `paying` states are written before remote mutations. If the connection fails or the process stops, the next command must reconcile using `sync`. `submit` never recreates a claimed job, even across restarts or simultaneous operator runs. Simulated payment is also claimed once.
+The `creating`, `confirming` and `paying` states are written before remote mutations. If the connection fails or the process stops, the next command must reconcile using `sync`. `submit` never recreates a claimed job, even across restarts or simultaneous operator runs. Simulated payment is also claimed once.
 
 If reconciliation cannot prove the result, the job stays held with `last_error`; do not delete it, clear its state or create a replacement supplier order. Inspect the matching custom order number in MyCJ. This release does not implement an administrative retry/reset for a definitively rejected request. Use a new sandbox checkout for a new test after reviewing the old job. Tracking/status regressions are ignored; cancellation remains terminal. No claim of exactly-once delivery across a remote system is made.
 
 ## Verification and limits
 
-`npm test` passes 37 tests. The new tests exercise signed payment-to-queue-to-CJ-to-tracking using in-memory API fixtures, restart recovery, concurrency, lost creation/payment responses, address validation, database rollback and live-mode rejection. These are not real CJ account calls.
+`npm test` passes 39 tests. The new tests exercise signed payment-to-queue-to-CJ-to-tracking using in-memory API fixtures, restart recovery, concurrency, lost creation/payment responses, address validation, database rollback and live-mode rejection. These are not real CJ account calls.
 
 The sandbox adapter is based on CJ's [sandbox documentation](https://developers.cjdropshipping.com/en/api/start/sandbox.html) and [shopping API](https://developers.cjdropshipping.com/en/api/api2/api/shopping.html). A deployed test must confirm account permissions, current response shapes, custom-ID lookup and sandbox payment behavior. If CJ omits `isSandbox` or the expected identity fields, the adapter stops instead of guessing.
 

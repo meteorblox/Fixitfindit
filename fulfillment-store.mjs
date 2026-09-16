@@ -71,8 +71,8 @@ export function fulfillmentStore(db) {
       const states={CREATED:'created',IN_CART:'created',UNPAID:'created',UNSHIPPED:'paid',PENDING:'paid',PROCESSING:'paid',SHIPPED:'shipped',DELIVERED:'delivered',CANCELLED:'cancelled',CLOSED:'cancelled'};
       const next=states[detail.orderStatus];
       if(!next) throw new Error('Unrecognized CJ order status.');
-      const rank={creating:0,created:1,paying:2,paid:3,shipped:4,delivered:5,cancelled:6};
-      const advances=rank[next]>=rank[job.state];
+      const rank={creating:0,created:1,confirming:1.5,paying:2,paid:3,shipped:4,delivered:5,cancelled:6};
+      const advances=rank[next]>=rank[job.state] || (job.state==='confirming' && detail.orderStatus==='UNPAID');
       // Ignore stale status/tracking responses instead of reverting delivered orders.
       const state=advances?next:job.state;
       const track=advances && typeof detail.trackNumber==='string' && detail.trackNumber.length<=200?detail.trackNumber:job.track_number;

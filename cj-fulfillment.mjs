@@ -2,13 +2,13 @@ const base='https://developers.cjdropshipping.com/api2.0/v1';
 export function createCjFulfillment({apiKey=process.env.CJ_API_KEY,mode=process.env.CJ_FULFILLMENT_MODE,request=fetch,interval=1100}={}) {
   let token,expires=0,authentication,queue=Promise.resolve(),nextCall=0;
   const enabled=()=>mode==='sandbox' && Boolean(apiKey);
-  function call(path,body,access) {
+  function call(path,body,access,method=body?'POST':'GET') {
     if(!enabled()) throw new Error('CJ sandbox fulfillment is not enabled.');
     const task=queue.then(async()=>{
       await new Promise(resolve=>setTimeout(resolve,Math.max(0,nextCall-Date.now())));
       nextCall=Date.now()+interval;
       try {
-        const res=await request(base+path,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(20000),
+        const res=await request(base+path,{method,redirect:'error',signal:AbortSignal.timeout(20000),
           headers:{'Content-Type':'application/json',...(access?{'CJ-Access-Token':access}:{})},
           ...(body?{body:JSON.stringify(body)}:{})});
         if(!res.ok) throw new Error();
@@ -38,6 +38,11 @@ export function createCjFulfillment({apiKey=process.env.CJ_API_KEY,mode=process.
   }
   return {
     enabled,detail,
+    async confirm(id) {
+      const order=await detail(id);
+      if(!['CREATED','IN_CART'].includes(order.orderStatus)) throw new Error('Only an unconfirmed sandbox order can be confirmed.');
+      return call('/shopping/order/confirmOrder',{orderId:id},await authenticate(),'PATCH');
+    },
     async create(payload) {
       if(payload?.isSandbox!==1 || payload.payType!==3 || !/^FITTEST-[a-f0-9-]{36}$/.test(payload.orderNumber||'')) throw new Error('Only FixItFindIt sandbox orders can be created.');
       // A closed set of fields and fixed flags prevents accidental live ordering.
