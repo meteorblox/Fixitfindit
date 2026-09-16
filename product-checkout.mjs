@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {createCheckout} from './checkout.mjs';
 import {shippingQuotes} from './shipping-quotes.mjs';
 import {selectedProducts} from './selected-products.mjs';
+import {includedShipping,requireIncludedMargin} from './pricing-policy.mjs';
 
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=c=>'$'+(c/100).toFixed(2);
@@ -12,7 +13,7 @@ const origins=new Set(['https://www.fixitfindit.com','https://fixitfindit.com','
 export async function checkoutItem(catalog, variantId) {
   const product=selectedProducts.find(p=>p.pricedVariants?.some(v=>v.id===variantId));
   const variant=product?.pricedVariants.find(v=>v.id===variantId);
-  if(!variant || !product.lookup.pid) throw new Error('This option does not have approved checkout pricing.');
+  if(!variant || !product.lookup.pid || product.checkoutHold) throw new Error('This option does not have approved checkout pricing.');
   const details=await catalog.detail(product.category,product.lookup.pid);
   const actual=details.variants.find(v=>v.id===variantId);
   if(!actual || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('This option does not currently have confirmed stock.');
@@ -20,8 +21,8 @@ export async function checkoutItem(catalog, variantId) {
 }
 
 export function productCheckoutPage({message='',enabled=false,chosen='',quotes=[]}={}) {
-  const products=selectedProducts.filter(p=>p.pricedVariants?.length);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Product checkout test · FixItFindIt</title><style>body{margin:0;background:#f7f5ef;color:#173c35;font:17px/1.6 system-ui}main{max-width:650px;margin:6vh auto;padding:32px;background:white;border-radius:22px}h1{line-height:1.15}a{color:#216653}label{display:block}input,select,button{box-sizing:border-box;width:100%;font:inherit;padding:14px;border-radius:8px;margin:10px 0}button{background:#216653;color:white;border:0;cursor:pointer}.status{padding:16px;background:#eef4ef;border-radius:8px}.note{font-size:14px}</style></head><body><main><a href="/">FixItFindIt</a><p>PRODUCT CHECKOUT · SANDBOX</p><h1>Try a product purchase.</h1><p>Test the selected product and price with Stripe. No money moves, no products ship, and no partner commission is earned.</p>${message?`<p class="status" role="status">${esc(message)}</p>`:''}${quotes.length?`<section><h2>Choose shipping</h2><p><strong>${esc(quotes[0].name)}</strong></p><p>Quoted for ZIP ${esc(quotes[0].shipping.zip)}. Use this ZIP in Stripe. Quotes expire after 10 minutes.</p>${quotes.map(q=>`<form method="post" action="/checkout/products/start"><input type="hidden" name="quote" value="${esc(q.quoteId)}"><h3>${esc(q.shipping.name)}</h3><p>Estimated transit: ${esc(q.shipping.days)} days. Product: ${usd(q.retailCents)}; shipping: ${usd(q.shipping.cents)}; total before sales tax: ${usd(q.retailCents+q.shipping.cents)}.</p><p>${q.shipping.feesConfirmed?'CJ returned a total postage estimate. Final supplier charges still require verification.':'Base postage estimate only: additional supplier fees are unconfirmed.'}</p><button>Continue with this shipping · test only →</button></form>`).join('')}</section>`:''}${enabled?`<form method="post" action="/checkout/products/quote"><label>Product and option<select name="variant" required>${products.map(p=>`<optgroup label="${esc(p.name)}">${p.pricedVariants.map(v=>`<option value="${esc(v.id)}" ${v.id===chosen?'selected':''}>${esc(v.name)} · ${usd(v.retailCents)}</option>`).join('')}</optgroup>`).join('')}</select></label><label>US delivery ZIP code<input name="zip" required pattern="[0-9]{5}" maxlength="5" inputmode="numeric" autocomplete="postal-code"></label><p>Quantity: 1. Choose shipping before continuing. Applicable sales tax is added at Stripe checkout.</p><button>Get shipping options →</button></form>`:''}<p class="note">Use test card <b>4242 4242 4242 4242</b>, any future expiry and any three-digit CVC. Use test contact details.</p><p class="note">Stripe calculates applicable tax using the shipping address and sandbox tax settings. This test does not reserve inventory. Delivery costs and fulfillment must be completed before live sales.</p><a href="/checkout/products">Start another product test</a></main></body></html>`;
+  const products=selectedProducts.filter(p=>p.pricedVariants?.length && !p.checkoutHold);
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Product checkout test · FixItFindIt</title><style>body{margin:0;background:#f7f5ef;color:#173c35;font:17px/1.6 system-ui}main{max-width:650px;margin:6vh auto;padding:32px;background:white;border-radius:22px}h1{line-height:1.15}a{color:#216653}label{display:block}input,select,button{box-sizing:border-box;width:100%;font:inherit;padding:14px;border-radius:8px;margin:10px 0}button{background:#216653;color:white;border:0;cursor:pointer}.status{padding:16px;background:#eef4ef;border-radius:8px}.note{font-size:14px}</style></head><body><main><a href="/">FixItFindIt</a><p>PRODUCT CHECKOUT · SANDBOX</p><h1>Try a product purchase.</h1><p>Test the selected product and price with Stripe. No money moves, no products ship, and no partner commission is earned.</p>${message?`<p class="status" role="status">${esc(message)}</p>`:''}${quotes.length?`<section><h2>Included standard shipping</h2><p><strong>${esc(quotes[0].name)}</strong></p><p>Quoted for ZIP ${esc(quotes[0].shipping.zip)}. Use this ZIP in Stripe. Quotes expire after 10 minutes.</p>${quotes.map(q=>`<form method="post" action="/checkout/products/start"><input type="hidden" name="quote" value="${esc(q.quoteId)}"><h3>${esc(q.shipping.name)}</h3><p>Estimated transit: ${esc(q.shipping.days)} days. Product: ${usd(q.retailCents)}; standard shipping: included; total before sales tax: ${usd(q.retailCents+q.shipping.cents)}.</p><p>${q.shipping.feesConfirmed?'CJ returned a total postage estimate. Final supplier charges still require verification.':'Base postage estimate only: additional supplier fees are unconfirmed.'}</p><button>Continue with this shipping · test only →</button></form>`).join('')}</section>`:''}${enabled?`<form method="post" action="/checkout/products/quote"><label>Product and option<select name="variant" required>${products.map(p=>`<optgroup label="${esc(p.name)}">${p.pricedVariants.map(v=>`<option value="${esc(v.id)}" ${v.id===chosen?'selected':''}>${esc(v.name)} · ${usd(v.retailCents)}</option>`).join('')}</optgroup>`).join('')}</select></label><label>US delivery ZIP code<input name="zip" required pattern="[0-9]{5}" maxlength="5" inputmode="numeric" autocomplete="postal-code"></label><p>Quantity: 1. Standard shipping is included where available. Check your ZIP before continuing. Applicable sales tax is added at Stripe checkout.</p><button>Get shipping options →</button></form>`:''}<p class="note">Use test card <b>4242 4242 4242 4242</b>, any future expiry and any three-digit CVC. Use test contact details.</p><p class="note">Stripe calculates applicable tax using the shipping address and sandbox tax settings. This test does not reserve inventory. Delivery costs and fulfillment must be completed before live sales.</p><a href="/checkout/products">Start another product test</a></main></body></html>`;
 }
 
 export function createProductCheckoutRoute({catalog,checkout=createCheckout(),quotes=shippingQuotes}={}) {
@@ -49,15 +50,22 @@ export function createProductCheckoutRoute({catalog,checkout=createCheckout(),qu
           if(!/^\d{5}$/.test(zip)) {page(400,'Enter a five-digit US ZIP code.',true);return true;}
           const item=await checkoutItem(catalog,form.get('variant'));
           const options=await catalog.shipping(item.category,item.productId,item.variantId,zip,1);
-          const saved=options.filter(o=>o.name && Number.isSafeInteger(o.price) && o.price>=0).slice(0,12).map(o=>quotes.save(reference,{
-            ...item,shipping:{name:o.name,days:o.days,cents:o.totalCents??o.price,zip,origin:item.origin,feesConfirmed:o.feesConfirmed===true}
-          }));
-          page(200,saved.length?'Choose a shipping option below.':'No shipping options are available for this product and ZIP.',true,saved);return true;
+          const eligible=options.filter(o=>o.feesConfirmed===true).sort((a,b)=>a.totalCents-b.totalCents).map(o=>includedShipping(item,o,zip)).find(Boolean);
+          const saved=eligible?[quotes.save(reference,eligible)]:[];
+          page(200,saved.length?'Standard shipping is included for this product and ZIP.':'Included standard shipping is unavailable for this product and ZIP. Please try another product.',true,saved);return true;
         }
         let item;
         try {item=quotes.get(reference,form.get('quote')||'');} catch {page(409,'Shipping quote expired or unavailable. Get a fresh quote.',true);return true;}
         const current=await checkoutItem(catalog,item.variantId);
         if(current.retailCents!==item.retailCents || current.supplierCents!==item.supplierCents) {page(409,'Product price changed. Get a fresh shipping quote.',true);return true;}
+        try {
+          requireIncludedMargin(item);
+          const methods=await catalog.shipping(current.category,current.productId,current.variantId,item.shipping.zip,1);
+          const method=methods.find(o=>o.name===item.shipping.name);
+          const refreshed=includedShipping(current,method,item.shipping.zip);
+          if(!refreshed) throw new Error('Delivery costs changed');
+          item={...refreshed,quoteId:item.quoteId};
+        } catch {page(409,'Delivery quote changed or is unavailable. Get a fresh quote.',true);return true;}
         const destination=await checkout.startProduct(req.headers.origin,reference,item);
         res.writeHead(303,{Location:destination,'Cache-Control':'no-store'});res.end();
       } else if(url.pathname==='/checkout/products/result' && req.method==='GET') {

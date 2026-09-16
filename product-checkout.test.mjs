@@ -1,3 +1,4 @@
+import {includedShipping} from './pricing-policy.mjs';
 import {createQuoteStore} from './shipping-quotes.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,18 +8,18 @@ import {Readable} from 'node:stream';
 import {createCatalog} from './catalog.mjs';
 
 const vid='1696373349854752768';
-const catalog={detail:async()=>({variants:[{id:vid,price:190,stock:10}]})};
+const catalog={detail:async()=>({variants:[{id:vid,price:190,stock:10}]}),shipping:async()=>[{name:'Standard',totalCents:650,feesConfirmed:true}]};
 test('approved variant lookup works independently of category search',async()=>{
   const supplier=createCatalog({apiKey:'test',interval:0,request:async(url)=>{
     assert.ok(!url.includes('/listV2'));
     const data=url.includes('getAccessToken')?{accessToken:'test'}:url.includes('getInventoryByPid')?{variantInventories:[{vid,inventory:[{countryCode:'CN',totalInventory:5}]}]}:{variants:[{vid,variantKey:'Black-1PC',variantSellPrice:1.90}]};
     return {ok:true,json:async()=>({result:true,data})};
   }});
-  assert.equal((await checkoutItem(supplier,vid)).retailCents,1700);
+  assert.equal((await checkoutItem(supplier,vid)).retailCents,2299);
 });
 test('only approved exact single variants with stock can enter checkout',async()=>{
   const item=await checkoutItem(catalog,vid);
-  assert.equal(item.retailCents,1700);
+  assert.equal(item.retailCents,2299);
   await assert.rejects(checkoutItem(catalog,'1732944160014995456'));
   await assert.rejects(checkoutItem({detail:async()=>({variants:[{id:vid,price:190,stock:null}]})},vid));
 });
@@ -30,7 +31,7 @@ test('product sessions use fixed pricing, supplier identifiers and sandbox guard
     return {ok:true,json:async()=>({livemode:false,url:'https://checkout.stripe.com/c/pay/test'})};
   }});
   await checkout.startProduct('https://www.fixitfindit.com','ref',item);
-  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'1700');
+  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2299');
   assert.equal(submitted.get('metadata[variant_id]'),vid);
   assert.equal(submitted.get('metadata[fulfillment]'),'sandbox-do-not-ship');
   await assert.rejects(createCheckout({key:'sk_live_example',request:()=>assert.fail('Live request attempted')}).startProduct('https://www.fixitfindit.com','ref',item));
@@ -50,7 +51,7 @@ test('confirmation requires matching owner, amount, currency, sandbox and paid s
 test('route rejects cross-origin posts and ignores client supplied prices',async()=>{
   let captured;
   const quotes=createQuoteStore(':memory:');
-  const quote=quotes.save('12345678-1234-1234-1234-123456789abc',await checkoutItem(catalog,vid));
+  const quote=quotes.save('12345678-1234-1234-1234-123456789abc',includedShipping(await checkoutItem(catalog,vid),{name:'Standard',totalCents:650,feesConfirmed:true},'60601'));
   const route=createProductCheckoutRoute({catalog,quotes,checkout:{enabled:()=>true,startProduct:async(o,r,item)=>{captured=item;return 'https://checkout.stripe.com/test';}}});
   const run=async(origin)=>{
     const req=Readable.from([`quote=${quote.quoteId}&variant=${vid}&retailCents=1&shippingCents=1&quantity=100`]);
@@ -62,6 +63,6 @@ test('route rejects cross-origin posts and ignores client supplied prices',async
   assert.equal(await run('https://attacker.example'),403);
   assert.equal(captured,undefined);
   assert.equal(await run('https://www.fixitfindit.com'),303);
-  assert.equal(captured.retailCents,1700);
+  assert.equal(captured.retailCents,2299);
   quotes.close();
 });

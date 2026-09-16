@@ -45,7 +45,7 @@ test('quote to Stripe to paid order preserves shipping, ignores browser amounts 
       submitted=new URLSearchParams(options.body);
       const metadata=Object.fromEntries([...submitted].filter(([k])=>k.startsWith('metadata[')).map(([k,v])=>[k.slice(9,-1),v]));
       session={id:'cs_test_shipping',livemode:false,url:'https://checkout.stripe.com/test',currency:'usd',client_reference_id:owner,
-        status:'open',payment_status:'unpaid',metadata,amount_subtotal:1700,automatic_tax:{enabled:true,status:'requires_location_inputs'}};
+        status:'open',payment_status:'unpaid',metadata,amount_subtotal:2299,automatic_tax:{enabled:true,status:'requires_location_inputs'}};
     }
     return {ok:true,json:async()=>session};
   }});
@@ -59,7 +59,7 @@ test('quote to Stripe to paid order preserves shipping, ignores browser amounts 
   const page=await post('quote',`variant=${vid}&zip=60601&shippingCents=1`);
   assert.equal(page.status,200);
   assert.ok(page.html.includes('Test &lt;carrier&gt;'));
-  assert.ok(page.html.includes('$23.50'));
+  assert.ok(page.html.includes('$22.99'));
   const quoteId=page.html.match(/name="quote" value="([^"]+)"/)[1];
   assert.equal((await post('start','quote='+quoteId,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')).status,409);
   assert.equal((await post('start','variant='+vid)).status,409);
@@ -67,18 +67,19 @@ test('quote to Stripe to paid order preserves shipping, ignores browser amounts 
   assert.equal((await post('start','quote='+quoteId)).status,503);
   stock=5;
   assert.equal((await post('start',`quote=${quoteId}&shippingCents=1&retailCents=1`)).status,303);
-  assert.equal(submitted.get('shipping_options[0][shipping_rate_data][fixed_amount][amount]'),'650');
-  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'1700');
+  assert.equal(submitted.get('shipping_options[0][shipping_rate_data][fixed_amount][amount]'),'0');
+  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2299');
   const orderId=session.metadata.order_id;
-  assert.equal(orders.get(orderId).shipping_cents,650);
-  assert.equal(orders.get(orderId).retail_cents,1700);
-  session={...session,status:'complete',payment_status:'paid',amount_total:2538,
-    total_details:{amount_shipping:650,amount_tax:188,amount_discount:0},automatic_tax:{enabled:true,status:'complete'},
+  assert.equal(orders.get(orderId).shipping_cents,0);
+  assert.equal(JSON.parse(orders.get(orderId).shipping_snapshot).supplierCents,650);
+  assert.equal(orders.get(orderId).retail_cents,2299);
+  session={...session,status:'complete',payment_status:'paid',amount_total:2487,
+    total_details:{amount_shipping:0,amount_tax:188,amount_discount:0},automatic_tax:{enabled:true,status:'complete'},
     collected_information:{shipping_details:{address:{country:'US',postal_code:'60601-1234'}}}};
   orders.recordSession(session,'evt_shipping','checkout.session.completed');
   orders.recordSession(session,'evt_shipping','checkout.session.completed');
   assert.equal(orders.get(orderId).status,'paid_sandbox');
-  assert.equal(orders.get(orderId).total_cents,2538);
+  assert.equal(orders.get(orderId).total_cents,2487);
   assert.equal(orders.get(orderId).shipping_address_matches,1);
   assert.equal((await checkout.verifyProduct(session.id,owner)).destinationMatches,true);
   assert.throws(()=>orders.recordSession({...session,total_details:{...session.total_details,amount_shipping:1}},'evt_tampered'));

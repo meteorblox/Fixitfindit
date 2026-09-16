@@ -11,16 +11,22 @@ import {createWebhookRoute} from './stripe-webhook.mjs';
 import {createCjFulfillment} from './cj-fulfillment.mjs';
 import {createFulfillmentWorker} from './fulfillment-worker.mjs';
 import {createCheckout} from './checkout.mjs';
+import {pricingVersion} from './pricing-policy.mjs';
 
 const secret='whsec_fixture';
 const item={productId:'1696373349800226816',variantId:'1696373349854752768',name:'Faucet',retailCents:1700,automaticTax:true,quoteId:'quote-fixture',
   shipping:{cents:650,zip:'60601',name:'Test carrier',origin:'CN',feesConfirmed:true}};
-function fixture(path=':memory:') {
-  const orders=createOrderStore(path),order=orders.prepare('owner',item);
+function fixture(path=':memory:',purchase=item) {
+  const orders=createOrderStore(path),order=orders.prepare('owner',purchase);
   const session={id:'cs_test_fulfillment',livemode:false,client_reference_id:'owner',currency:'usd',status:'complete',payment_status:'paid',
     amount_subtotal:1700,amount_total:2538,total_details:{amount_tax:188,amount_shipping:650,amount_discount:0},automatic_tax:{enabled:true,status:'complete'},
     metadata:{purpose:'fixitfindit-product-sandbox',fulfillment:'sandbox-do-not-ship',store_id:'fixitfindit',order_id:order.id,product_id:item.productId,variant_id:item.variantId,retail_cents:'1700',shipping_cents:'650',shipping_zip:'60601',quantity:'1',tax_mode:'automatic'},
     collected_information:{shipping_details:{name:'Sandbox Recipient',address:{country:'US',postal_code:'60601',state:'IL',city:'Chicago',line1:'123 Test Street',line2:''}}}};
+  session.amount_subtotal=purchase.retailCents;
+  session.total_details.amount_shipping=purchase.shipping.cents;
+  session.amount_total=purchase.retailCents+purchase.shipping.cents+188;
+  session.metadata.retail_cents=String(purchase.retailCents);
+  session.metadata.shipping_cents=String(purchase.shipping.cents);
   return {orders,order,session};
 }
 async function notify(orders,session,eventId='evt_fixture') {
@@ -63,6 +69,22 @@ function supplier({loseCreate=false,losePayment=false,loseConfirmation=false,shi
   return {cj,calls,get remote(){return remote;},get creates(){return creates;},get payments(){return payments;}};
 }
 const catalog={detail:async()=>({variants:[{id:item.variantId,stock:5,price:190}]})};
+
+test('included shipping survives webhook and supplier cost increases block creation',async()=>{
+  const purchase={...item,retailCents:2299,shipping:{...item.shipping,cents:0,supplierCents:650,supplierProductCents:190,pricingVersion}};
+  const {orders,order,session}=fixture(':memory:',purchase);await notify(orders,session);
+  assert.equal(orders.fulfillment.get(order.id).state,'ready');
+  let price=2000,freight=650;
+  const current={detail:async()=>({origin:'CN',variants:[{id:item.variantId,stock:5,price}]}),shipping:async()=>[{name:'Test carrier',totalCents:freight,feesConfirmed:true}]};
+  const mock=supplier(),worker=createFulfillmentWorker({orders,cj:mock.cj,catalog:current});
+  await assert.rejects(worker.submit(order.id),/minimum margin/);
+  assert.equal(mock.creates,0);assert.equal(orders.fulfillment.get(order.id).state,'ready');
+  price=190;freight=2000;
+  await assert.rejects(worker.submit(order.id),/minimum margin/);assert.equal(mock.creates,0);
+  freight=650;await worker.submit(order.id);assert.equal(mock.creates,1);
+  assert.equal(orders.get(order.id).shipping_cents,0);
+  assert.equal(JSON.parse(orders.get(order.id).shipping_snapshot).supplierCents,650);orders.close();
+});
 
 test('CJ shipment code is preserved for mutations while child order identity stays pinned',async()=>{
   const {orders,order,session}=fixture();await notify(orders,session);

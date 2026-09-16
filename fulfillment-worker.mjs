@@ -1,4 +1,5 @@
 import {selectedProducts} from './selected-products.mjs';
+import {includedShipping,requireIncludedMargin} from './pricing-policy.mjs';
 
 export function createFulfillmentWorker({orders,cj,catalog}) {
   const jobs=orders.fulfillment;
@@ -23,10 +24,18 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
       if(!cj.enabled()) throw new Error('CJ sandbox fulfillment is not enabled.');
       const order=orders.get(id),payload=JSON.parse(job.payload_json);
       const product=selectedProducts.find(p=>p.lookup.pid===order.product_id);
-      if(!product?.pricedVariants.some(v=>v.id===order.variant_id)) throw new Error('Product is no longer approved.');
+      if(product?.checkoutHold || !product?.pricedVariants.some(v=>v.id===order.variant_id)) throw new Error('Product is no longer approved.');
       const current=await catalog.detail(product.category,order.product_id);
       const variant=current.variants.find(v=>v.id===order.variant_id);
       if(!Number.isSafeInteger(variant?.stock)||variant.stock<1) throw new Error('Supplier stock is unavailable.');
+      const quote=order.shipping_snapshot?JSON.parse(order.shipping_snapshot):null;
+      if(quote?.pricingVersion) {
+        const methods=await catalog.shipping(product.category,order.product_id,order.variant_id,quote.zip,1);
+        const method=methods.find(o=>o.name===quote.name);
+        const priced=includedShipping({retailCents:order.retail_cents,supplierCents:variant.price,origin:current.origin||product.origin},method,quote.zip);
+        if(!priced || order.shipping_cents!==0) throw new Error('Current delivery costs do not meet the minimum margin.');
+        requireIncludedMargin(priced,Math.max(order.tax_cents||0,Math.ceil(order.retail_cents*.105)));
+      }
       // Persist the claim before any create call. An interrupted claim is never
       // automatically retried: sync uses the stable custom order number instead.
       if(!jobs.claim(id,'ready','creating')) return jobs.summary(id);

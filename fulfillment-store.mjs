@@ -1,4 +1,5 @@
 import {selectedProducts} from './selected-products.mjs';
+import {requireIncludedMargin} from './pricing-policy.mjs';
 
 const timestamp=()=>new Date().toISOString();
 const required=(value,max)=>{
@@ -11,6 +12,7 @@ export function sandboxPayload(order,session) {
   if(order.quantity!==1 || !product?.pricedVariants.some(v=>v.id===order.variant_id)) throw new Error('unapproved_variant');
   if(!order.shipping_snapshot) throw new Error('missing_shipping_quote');
   const quote=JSON.parse(order.shipping_snapshot);
+  if(quote.pricingVersion) requireIncludedMargin({retailCents:order.retail_cents,supplierCents:quote.supplierProductCents,shipping:quote},Math.max(order.tax_cents||0,Math.ceil(order.retail_cents*.105)));
   const shipping=session.collected_information?.shipping_details||session.shipping_details;
   const address=shipping?.address;
   if(address?.country!=='US' || !/^\d{5}(?:-\d{4})?$/.test(address?.postal_code||'') || address.postal_code.slice(0,5)!==quote.zip) throw new Error('shipping_address_mismatch');

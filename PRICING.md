@@ -1,0 +1,13 @@
+# Included standard shipping — September 16, 2026
+
+Owner accepted $22.99 for either single faucet attachment, $39.99 for all selected mushroom lamps, and $89.99 for the American Standard electric pan, conditional on protecting margin. Pan checkout and new fulfillment remain held pending voltage/product confirmation. Live payments remain disabled.
+
+New checkout selects the lowest quoted eligible shipping method. Eligibility requires a confirmed total postage estimate and at least $5 modeled contribution after supplier product/freight, 5% affiliate commission, 5% returns allowance, domestic-card fees (2.9% + $0.30), and a provisional 0.5% tax-service allowance. Percentage service fees use a 10.5% sales-tax stress assumption; fulfillment uses the larger of that assumption or recorded tax. This is not a universal sales-tax rate. Public fee source: https://stripe.com/pricing. Account-specific fees, international cards, advertising, overhead, payout fees and losses beyond the allowance are not covered. This is not a guarantee of profit.
+
+Supplier freight remains in the private order shipping snapshot as supplierCents; customer shipping cents is zero. supplierProductCents and pricingVersion also persist there. Stripe still gets a fixed shipping rate of zero. Snapshot supplier costs are not exposed as an additional checkout charge. Existing orders and their original shipping amounts are unchanged.
+
+The route rejects old pricing quotes, rechecks price/stock, and checks the chosen carrier's current quote before opening Stripe. A new sandbox fulfillment submission checks current stock, product cost, the selected carrier's quote, and the margin before its irreversible claim. Unknown totals or insufficient margin stop the operation without silently increasing the customer charge or substituting variants. As before, only signed successful sandbox webhooks can enqueue fulfillment; address mismatches block it.
+
+Supplier quotes are cached for up to one minute and product details for five minutes in the storefront. Quotes are ZIP estimates, not guaranteed full-address landed costs; final supplier charges, address changes, quote/session expiry alignment and production controls remain launch work. The budget floor protects the stated model only.
+
+All 43 automated tests pass, including zero customer shipping with persisted supplier freight, signed payment-to-fulfillment, cost increases preventing supplier creation, held pan, unknown fee rejection, price tampering, and legacy paid-order verification. These tests use fixtures; a deployed checkout check follows publication.
