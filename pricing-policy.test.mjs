@@ -18,6 +18,10 @@ test('unconfirmed fees and below-floor quotes cannot become free shipping',()=>{
   assert.throws(()=>requireIncludedMargin({...good,shipping:{...good.shipping,supplierCents:9999}}));
   assert.throws(()=>requireIncludedMargin({...good,shipping:{...good.shipping,pricingVersion:undefined}}));
 });
-test('electric pan is held even if supplier stock exists',async()=>{
-  await assert.rejects(checkoutItem({detail:()=>assert.fail('held product reached supplier')},'2502240123311602500'));
+test('owner-approved American Standard pan uses exact variant and protected pricing',async()=>{
+  const variantId='2502240123311602500';
+  const pan=await checkoutItem({detail:async()=>({origin:'CN',variants:[{id:variantId,price:1095,stock:5}]})},variantId);
+  assert.equal(pan.variantId,variantId);assert.equal(pan.retailCents,8999);
+  assert.ok(includedShipping(pan,{name:'Standard',totalCents:2908,feesConfirmed:true},'60601'));
+  assert.equal(includedShipping(pan,{name:'Standard',totalCents:9000,feesConfirmed:true},'60601'),null);
 });
