@@ -1,4 +1,5 @@
 import {selectedProducts} from './selected-products.mjs';
+import {normalizeShipping} from './shipping-quotes.mjs';
 export const categories = [
   {slug:'kitchen',name:'Kitchen',query:'kitchen'},
   {slug:'cleaning',name:'Cleaning',query:'cleaning brush'},
@@ -115,7 +116,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       const access=await authenticate();
       const data=await call('/logistic/freightCalculate',{method:'POST',headers:{'CJ-Access-Token':access,'Content-Type':'application/json'},body:JSON.stringify({startCountryCode:details.origin,endCountryCode:'US',zip,products:[{vid,quantity}]})});
       if(!Array.isArray(data)) throw new Error('Invalid shipping response');
-      return data.map(r=>({name:String(r.logisticName || 'Shipping'),days:String(r.logisticAging || 'Unavailable'),price:money(r.logisticPrice)})).filter(r=>r.price!==null).sort((a,b)=>a.price-b.price);
+      return data.map(normalizeShipping).filter(r=>r.name && r.price!==null).sort((a,b)=>(a.totalCents??a.price)-(b.totalCents??b.price));
     });
   }
   return {list,detail,shipping};

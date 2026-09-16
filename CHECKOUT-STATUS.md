@@ -1,6 +1,18 @@
 # Product checkout status
 
-Updated September 15, 2026.
+Updated September 16, 2026. Repository capabilities below are not proof of deployment.
+
+## Shipping checkout implementation
+
+Product sandbox checkout now asks for a US ZIP, obtains CJ shipping options, and requires a server-stored quote before creating Stripe Checkout. Quotes expire after ten minutes, are bound to the checkout owner, and persist in `shipping_quotes` in the existing `ORDERS_DB_PATH` SQLite database. No new secret or dependency is required. Missing persistent storage disables shipping checkout.
+
+The chosen quote snapshots the exact variant, product price, supplier unit cost, origin, ZIP, method, shipping amount and whether CJ returned enough fee information. Stripe receives one fixed shipping rate with exclusive sales tax. Product revenue, shipping and tax remain separate on the order. Browser-submitted prices are ignored; stock and product price are checked again before creating the session. Stripe payment totals must match the saved shipping amount. The paid address's country/ZIP match is stored separately; an address mismatch does not erase receipt of payment and must block future live fulfillment.
+
+CJ `totalPostageFee` is used when valid; otherwise explicit base postage plus taxes/customs-clearance fees can form the estimate. If fees are missing, sandbox checkout explicitly labels the amount as base postage only. These estimates are not confirmation of final supplier charges. ZIP quotes are not full-address quotes. Stripe's hosted address can change after the quote: the implementation detects this after payment; a live flow must prevent or resolve this before fulfillment. The shipping quote expires for session creation, but the resulting Stripe session can remain open longer; live checkout needs quote/session expiry coordination and a final cost/stock check.
+
+Validation: `npm test` passes 30 tests, including quote persistence/expiry/ownership, fee accounting, amount tampering, stock loss, Stripe shipping totals and address mismatches. All external CJ/Stripe responses in automated tests are fixtures. A deployed sandbox run against the configured accounts is still required.
+
+Remaining step 1 work: verify account configuration and real supplier charges; full-address delivered pricing; authenticated order operations; durable CJ submission/payment with duplicate prevention and reconciliation; tracking; refund handling; and a controlled end-to-end test. Live checkout and supplier ordering remain disabled. Affiliate attribution and commissions are separate work; the agreed future commission is 5% of product subtotal after discounts, excluding shipping and tax.
 
 ## Deployed sandbox flow
 
@@ -13,8 +25,8 @@ A $17 silver faucet sandbox payment was completed in the browser on September 15
 ## Required before live sales
 
 - Persistent order storage and signed Stripe webhook support are implemented; verify the production mount and connect the sandbox Stripe endpoint as described below. Authenticated order administration is still required.
-- Address-specific delivered costs including applicable supplier fees; agreed pricing and delivery limits. The current product simulation charges $0 shipping and does not calculate tax.
-- Stripe automatic-tax integration and sandbox verification. Dashboard setup alone does not enable tax in these sessions.
+- Address-specific delivered costs including applicable supplier fees; agreed pricing and delivery limits. The repository now supports ZIP-based shipping estimates in sandbox checkout; final delivered costs are not verified.
+- Stripe automatic-tax sandbox verification. The repository enables automatic tax in product sessions; dashboard configuration and a deployed test still need verification.
 - CJ fulfillment workflow, tracking and refunds; no supplier order API is called by this code.
 - Confirm baking pan voltage and other unresolved product specifications before enabling real ordering.
 - Partner attribution, commission rate, ledger and payouts. No partner checkout is enabled.

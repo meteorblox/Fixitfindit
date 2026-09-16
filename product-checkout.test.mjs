@@ -1,3 +1,4 @@
+import {createQuoteStore} from './shipping-quotes.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCheckout} from './checkout.mjs';
@@ -48,9 +49,11 @@ test('confirmation requires matching owner, amount, currency, sandbox and paid s
 });
 test('route rejects cross-origin posts and ignores client supplied prices',async()=>{
   let captured;
-  const route=createProductCheckoutRoute({catalog,checkout:{enabled:()=>true,startProduct:async(o,r,item)=>{captured=item;return 'https://checkout.stripe.com/test';}}});
+  const quotes=createQuoteStore(':memory:');
+  const quote=quotes.save('12345678-1234-1234-1234-123456789abc',await checkoutItem(catalog,vid));
+  const route=createProductCheckoutRoute({catalog,quotes,checkout:{enabled:()=>true,startProduct:async(o,r,item)=>{captured=item;return 'https://checkout.stripe.com/test';}}});
   const run=async(origin)=>{
-    const req=Readable.from([`variant=${vid}&retailCents=1&quantity=100`]);
+    const req=Readable.from([`quote=${quote.quoteId}&variant=${vid}&retailCents=1&shippingCents=1&quantity=100`]);
     req.method='POST';req.headers={origin,cookie:'fit_product=12345678-1234-1234-1234-123456789abc','content-type':'application/x-www-form-urlencoded'};
     const res={writeHead(code){this.status=code;},end(){}};
     await route(req,res,new URL('https://www.fixitfindit.com/checkout/products/start'));
@@ -60,4 +63,5 @@ test('route rejects cross-origin posts and ignores client supplied prices',async
   assert.equal(captured,undefined);
   assert.equal(await run('https://www.fixitfindit.com'),303);
   assert.equal(captured.retailCents,1700);
+  quotes.close();
 });
