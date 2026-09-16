@@ -11,7 +11,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
     const job=requireJob(id);
     if(['ready','blocked'].includes(job.state)) throw new Error('Submit this sandbox order first.');
     try {
-      const detail=await cj.detail(job.cj_order_id||job.custom_order_id);
+      const detail=await cj.detail(job.cj_detail_order_id||job.cj_order_id||job.custom_order_id);
       return jobs.sync(id,detail);
     } catch {jobs.error(id,'reconciliation_required');throw new Error('Could not reconcile the CJ sandbox order. No duplicate order was submitted.');}
   }
@@ -39,7 +39,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
       const job=requireJob(id);
       if(job.state!=='created') return jobs.summary(id);
       if(!jobs.claim(id,'created','paying')) return jobs.summary(id);
-      try {await cj.simulatePayment(job.cj_order_id);}
+      try {await cj.simulatePayment(job.cj_detail_order_id);}
       catch {jobs.error(id,'payment_outcome_unknown');throw new Error('Sandbox payment outcome is uncertain. Run sync before any further action.');}
       return sync(id);
     },
@@ -47,7 +47,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
       await sync(id);
       const job=requireJob(id);
       if(!['paid','shipped','delivered'].includes(job.state)) throw new Error('Sandbox payment must be confirmed first.');
-      await cj.simulateTracking(job.cj_order_id,number);
+      await cj.simulateTracking(job.cj_detail_order_id,number);
       return sync(id);
     }
   };

@@ -31,7 +31,7 @@ async function notify(orders,session,eventId='evt_fixture') {
   await createWebhookRoute({orders,secret})(req,res,new URL('https://www.fixitfindit.com/webhooks/stripe'));
   return res.status;
 }
-function supplier({loseCreate=false,losePayment=false}={}) {
+function supplier({loseCreate=false,losePayment=false,shipmentId=false}={}) {
   let remote=null,creates=0,payments=0;
   const calls=[];
   const cj=createCjFulfillment({apiKey:'fixture-secret',mode:'sandbox',interval:0,request:async(url,options)=>{
@@ -44,21 +44,33 @@ function supplier({loseCreate=false,losePayment=false}={}) {
       assert.equal(body.isSandbox,1);assert.equal(body.payType,3);
       remote={orderId:'CJ-SANDBOX-1',orderNum:body.orderNumber,isSandbox:1,orderStatus:'CREATED',shippingCountryCode:'US',productList:[{vid:body.products[0].vid,quantity:1}],trackNumber:null};
       if(loseCreate) throw new Error('Connection lost after CJ accepted the order');
-      data={orderId:remote.orderId};
+      data={orderId:shipmentId?'SD-FIXTURE':remote.orderId};
     } else if(path.endsWith('/getOrderDetail')) {
       const id=new URL(url).searchParams.get('orderId');
-      assert.ok(remote && [remote.orderId,remote.orderNum].includes(id));data={...remote};
+      assert.ok(remote && [remote.orderId,remote.orderNum,...(shipmentId?['SD-FIXTURE']:[])].includes(id));data={...remote};
     } else if(path.endsWith('/sandbox/simulatePay')) {
-      payments++;remote.orderStatus='UNSHIPPED';
+      assert.equal(body.orderId,remote.orderId);payments++;remote.orderStatus='UNSHIPPED';
       if(losePayment) throw new Error('Connection lost after simulated payment');
       data=true;
-    } else if(path.endsWith('/sandbox/updateTrackNumber')) {remote.trackNumber=body.trackNumber;remote.trackingProvider='Fixture carrier';data=true;}
+    } else if(path.endsWith('/sandbox/updateTrackNumber')) {assert.equal(body.orderId,remote.orderId);remote.trackNumber=body.trackNumber;remote.trackingProvider='Fixture carrier';data=true;}
     else assert.fail('Unexpected supplier operation: '+path);
     return {ok:true,json:async()=>({result:true,data})};
   }});
   return {cj,calls,get remote(){return remote;},get creates(){return creates;},get payments(){return payments;}};
 }
 const catalog={detail:async()=>({variants:[{id:item.variantId,stock:5,price:190}]})};
+
+test('CJ shipment code resolves to a pinned child order ID used for sandbox operations',async()=>{
+  const {orders,order,session}=fixture();await notify(orders,session);
+  const mock=supplier({shipmentId:true}),worker=createFulfillmentWorker({orders,cj:mock.cj,catalog});
+  await worker.submit(order.id);
+  assert.equal(orders.fulfillment.get(order.id).cj_order_id,'SD-FIXTURE');
+  assert.equal(orders.fulfillment.get(order.id).cj_detail_order_id,'CJ-SANDBOX-1');
+  await worker.simulatePayment(order.id);await worker.simulateTracking(order.id,'SBX-MAPPING');
+  assert.equal(orders.fulfillment.get(order.id).track_number,'SBX-MAPPING');
+  assert.throws(()=>orders.fulfillment.sync(order.id,{...mock.remote,orderId:'different-child'}),/identity mismatch/);
+  assert.equal(mock.creates,1);assert.equal(mock.payments,1);orders.close();
+});
 
 test('signed payment enqueues once; sandbox submission, payment and tracking return to the owning checkout',async()=>{
   const {orders,order,session}=fixture();

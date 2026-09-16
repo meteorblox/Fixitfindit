@@ -35,6 +35,7 @@ export function fulfillmentStore(db) {
     state TEXT NOT NULL,payload_json TEXT,cj_order_id TEXT UNIQUE,
     supplier_status TEXT,track_number TEXT,tracking_provider TEXT,
     last_error TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);`);
+  if(!db.prepare('PRAGMA table_info(fulfillment_jobs)').all().some(c=>c.name==='cj_detail_order_id')) db.exec('ALTER TABLE fulfillment_jobs ADD COLUMN cj_detail_order_id TEXT');
   const get=id=>db.prepare('SELECT * FROM fulfillment_jobs WHERE order_id=?').get(id);
   const summary=id=>{
     const job=get(id);
@@ -63,7 +64,7 @@ export function fulfillmentStore(db) {
       if(!job || ['ready','blocked'].includes(job.state)) throw new Error('Order has not been submitted.');
       const payload=JSON.parse(job.payload_json);
       if(detail?.isSandbox!==1 || typeof detail.orderId!=='string' || !detail.orderId ||
-        (job.cj_order_id && job.cj_order_id!==detail.orderId) ||
+        (job.cj_detail_order_id && job.cj_detail_order_id!==detail.orderId) ||
         ![detail.orderNum,detail.platformOrderId].includes(job.custom_order_id) ||
         detail.shippingCountryCode!=='US' || !Array.isArray(detail.productList) || detail.productList.length!==1 ||
         detail.productList[0].vid!==payload.products[0].vid || detail.productList[0].quantity!==1) throw new Error('CJ sandbox order identity mismatch.');
@@ -76,8 +77,10 @@ export function fulfillmentStore(db) {
       const state=advances?next:job.state;
       const track=advances && typeof detail.trackNumber==='string' && detail.trackNumber.length<=200?detail.trackNumber:job.track_number;
       const provider=advances && typeof detail.trackingProvider==='string' && detail.trackingProvider.length<=200?detail.trackingProvider:job.tracking_provider;
-      db.prepare('UPDATE fulfillment_jobs SET cj_order_id=?,state=?,supplier_status=?,track_number=?,tracking_provider=?,last_error=?,updated_at=? WHERE order_id=?')
-        .run(detail.orderId,state,advances?detail.orderStatus:job.supplier_status,track||job.track_number||null,provider||job.tracking_provider||null,advances?null:job.last_error,timestamp(),id);
+      // Creation returns a shipment code; detail returns the child order ID.
+      // Bind that ID only after the custom order, sandbox and item checks above.
+      db.prepare('UPDATE fulfillment_jobs SET cj_order_id=COALESCE(cj_order_id,?),cj_detail_order_id=?,state=?,supplier_status=?,track_number=?,tracking_provider=?,last_error=?,updated_at=? WHERE order_id=?')
+        .run(detail.orderId,detail.orderId,state,advances?detail.orderStatus:job.supplier_status,track||job.track_number||null,provider||job.tracking_provider||null,advances?null:job.last_error,timestamp(),id);
       db.exec('COMMIT');return summary(id);
     } catch(e) {db.exec('ROLLBACK');throw e;}
   }
