@@ -6,7 +6,7 @@ export function createPricedCatalog(raw,{path=':memory:',now=Date.now}={}) {
  const db=new DatabaseSync(path);
  db.exec('PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS storefront_prices(product_id TEXT PRIMARY KEY, policy TEXT NOT NULL, expires INTEGER NOT NULL, snapshot TEXT NOT NULL)');
  const pending=new Set();let queue=Promise.resolve();
- function saved(id){const row=db.prepare('SELECT snapshot FROM storefront_prices WHERE product_id=? AND policy=? AND expires>?').get(id,version,now());return row?JSON.parse(row.snapshot):null;}
+ function saved(id){const row=db.prepare('SELECT snapshot FROM storefront_prices WHERE product_id=? AND policy=? AND expires>?').get(id,version,now());const value=row?JSON.parse(row.snapshot):null;return value?.name&&isReplacementPart(value.name)?null:value;}
  function save(id,value,ttl){db.prepare('INSERT OR REPLACE INTO storefront_prices VALUES(?,?,?,?)').run(id,version,now()+ttl,JSON.stringify(value));}
  async function refresh(product,category){
   try {

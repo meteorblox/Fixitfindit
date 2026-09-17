@@ -7,7 +7,7 @@ import {deliveredPrice} from './automatic-pricing.mjs';
 import {createCatalog} from './catalog.mjs';
 
 test('parts are excluded without hiding faucet attachments or complete brush bundles',()=>{
- for(const name of ['Red Replacement head','Spare mop pads','Replacement brush heads','Filter only','Refill']) assert.equal(isReplacementPart(name),true,name);
+ for(const name of ['Sheath-Black-Q1pc','Red Replacement head','Spare mop pads','Replacement brush heads','Filter only','Refill']) assert.equal(isReplacementPart(name),true,name);
  for(const name of ['Blue','Rotating Waterfall Faucet Attachment','Electric brush with 8 replacement heads','Electric brush with replaceable heads']) assert.equal(isReplacementPart(name),false,name);
 });
 test('replacement variants cannot be priced or submitted through direct checkout',async()=>{
