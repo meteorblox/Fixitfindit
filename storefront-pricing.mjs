@@ -5,8 +5,9 @@ const version='upfront-150-floor8-buffer25-v1';
 export function createPricedCatalog(raw,{path=':memory:',now=Date.now}={}) {
  const db=new DatabaseSync(path);
  db.exec('PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS storefront_prices(product_id TEXT PRIMARY KEY, policy TEXT NOT NULL, expires INTEGER NOT NULL, snapshot TEXT NOT NULL)');
- const pending=new Set();let queue=Promise.resolve();
- function saved(id){const row=db.prepare('SELECT snapshot FROM storefront_prices WHERE product_id=? AND policy=? AND expires>?').get(id,version,now());const value=row?JSON.parse(row.snapshot):null;if(value?.unavailable&&!value.reason)return null;return value?.name&&isReplacementPart(value.name)?null:value;}
+ const pending=new Set(),tasks=[];let queue=Promise.resolve(),running=false,lastCategory;
+ async function drain(){running=true;try{while(tasks.length){let index=tasks.findIndex(t=>t.category!==lastCategory);if(index<0)index=0;const {product,category}=tasks.splice(index,1)[0];lastCategory=category;try{await refresh(product,category);}catch{}finally{pending.delete(product.id);}}}finally{running=false;}}
+ function saved(id){const row=db.prepare('SELECT snapshot FROM storefront_prices WHERE product_id=? AND policy=? AND expires>?').get(id,version,now());const value=row?JSON.parse(row.snapshot):null;if(value?.unavailable&&(!value.reason||value.reason==='shipping_unconfirmed')&&!value.domesticPolicy)return null;return value?.name&&isReplacementPart(value.name)?null:value;}
  function save(id,value,ttl){db.prepare('INSERT OR REPLACE INTO storefront_prices VALUES(?,?,?,?)').run(id,version,now()+ttl,JSON.stringify(value));}
  async function refresh(product,category){
   try {
@@ -29,13 +30,13 @@ export function createPricedCatalog(raw,{path=':memory:',now=Date.now}={}) {
    console.info('catalog-price',category,product.id,'priced');return;
    } catch { /* Try another complete in-stock option before holding the product. */ }
    }
-   save(product.id,{unavailable:true,reason:'shipping_unconfirmed'},15*60000);console.info('catalog-price',category,product.id,'shipping_unconfirmed');
+   save(product.id,{unavailable:true,reason:'shipping_unconfirmed',domesticPolicy:1},15*60000);console.info('catalog-price',category,product.id,'shipping_unconfirmed');
   } catch {save(product.id,{unavailable:true,reason:'supplier_error'},5*60000);console.info('catalog-price',category,product.id,'supplier_error');}
  }
  function schedule(product,category){
   if(product.pricedVariants||product.checkoutHold||pending.has(product.id)||saved(product.id))return;
   pending.add(product.id);
-  queue=queue.then(()=>refresh(product,category)).catch(()=>{}).finally(()=>pending.delete(product.id));
+  tasks.push({product,category});if(!running)queue=drain();
  }
  function decorate(product){
   if(product.pricedVariants)return product;

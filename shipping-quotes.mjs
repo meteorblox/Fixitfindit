@@ -31,14 +31,17 @@ export function createQuoteStore(path,{now=Date.now}={}) {
 export const shippingQuotes=process.env.ORDERS_DB_PATH?createQuoteStore(process.env.ORDERS_DB_PATH):null;
 
 // Missing fee fields remain unknown, never silently become zero.
-export function normalizeShipping(row) {
+export function normalizeShipping(row,{origin,destination}={}) {
   const cents=value=>value===null||value===undefined||value===''?null:
     Number.isFinite(Number(value)) && Number(value)>=0 && Number.isSafeInteger(Math.round(Number(value)*100))?Math.round(Number(value)*100):null;
   const price=cents(row.logisticPrice),total=cents(row.totalPostageFee);
   const taxes=cents(row.taxesFee),clearance=cents(row.clearanceOperationFee);
   const sum=price!==null&&taxes!==null&&clearance!==null?price+taxes+clearance:null;
+  const domestic=origin==='US'&&destination==='US';
+  const omitted=v=>v===null||v===undefined||v==='';
+  const domesticTotal=domestic&&price!==null&&omitted(row.totalPostageFee)&&[row.taxesFee,row.clearanceOperationFee].every(v=>omitted(v)||cents(v)!==null)?price+(taxes??0)+(clearance??0):null;
   const totalCents=total!==null&&price!==null&&total>=price&&(sum===null||total>=sum)?total:
-    total===null?sum:null;
+    total===null?(sum??domesticTotal):null;
   return {name:String(row.logisticName||''),days:String(row.logisticAging||'Unavailable'),price,
     totalCents,taxesCents:taxes,clearanceCents:clearance,feesConfirmed:totalCents!==null};
 }

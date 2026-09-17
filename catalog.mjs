@@ -60,6 +60,14 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
           }
           if(rows.length<24 || (Number.isFinite(result.totalPages)&&page>=result.totalPages))break;
         }
+        // Preserve the established first-page options while expanding discovery.
+        if(expanded) {
+          try {
+            const params=new URLSearchParams({page:'1',size:'24',keyWord:slug==='cleaning'?'cleaning brush':category.query,countryCode:'US',orderBy:'1',sort:'desc'});
+            const old=await call('/product/listV2?'+params,{headers:{'CJ-Access-Token':access}});
+            for(const p of (old?.content||[]).flatMap(g=>g.productList||[])) if(p.id&&p.nameEn&&!seen.has(String(p.id))&&!isReplacementPart(p.nameEn)) {seen.add(String(p.id));products.push({id:String(p.id),name:String(p.nameEn),image:safeImage(p.bigImage),supplierPrice:String(p.sellPrice??''),listings:Number(p.listedNum)||0,hasVideo:p.isVideo===1,category:slug});}
+          }catch { /* Expanded results remain usable if the legacy query fails. */ }
+        }
         for(const selected of selectedProducts.filter(p=>p.category===slug)) {
           let loaded=false;
           try {
@@ -122,7 +130,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       const access=await authenticate();
       const data=await call('/logistic/freightCalculate',{method:'POST',headers:{'CJ-Access-Token':access,'Content-Type':'application/json'},body:JSON.stringify({startCountryCode:details.origin,endCountryCode:'US',zip,products:[{vid,quantity}]})});
       if(!Array.isArray(data)) throw new Error('Invalid shipping response');
-      return data.map(normalizeShipping).filter(r=>r.name && r.price!==null).sort((a,b)=>(a.totalCents??a.price)-(b.totalCents??b.price));
+      return data.map(row=>normalizeShipping(row,{origin:details.origin,destination:'US'})).filter(r=>r.name && r.price!==null).sort((a,b)=>(a.totalCents??a.price)-(b.totalCents??b.price));
     });
   }
   return {list,detail,shipping};

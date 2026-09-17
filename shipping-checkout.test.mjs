@@ -89,3 +89,11 @@ test('quote to Stripe to paid order preserves shipping, ignores browser amounts 
   assert.equal(orders.get(orderId).status,'paid_sandbox');
   orders.close();quotes.close();
 });
+
+test('US domestic postage accepts omitted customs fields while imports remain unverified',()=>{
+ const quote={logisticName:'Fedex US to US',logisticPrice:0,logisticAging:'3-7',totalPostageFee:null,taxesFee:null,clearanceOperationFee:null};
+ assert.equal(normalizeShipping(quote,{origin:'US',destination:'US'}).totalCents,0);
+ assert.equal(normalizeShipping(quote,{origin:'CN',destination:'US'}).feesConfirmed,false);
+ assert.equal(normalizeShipping({...quote,logisticPrice:4,taxesFee:2},{origin:'US',destination:'US'}).totalCents,600);
+ assert.equal(normalizeShipping({...quote,taxesFee:'bad'},{origin:'US',destination:'US'}).feesConfirmed,false);
+});
