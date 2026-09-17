@@ -1,3 +1,4 @@
+import {createManualPayouts} from './manual-payouts.mjs';
 import {createDashboardAccess,createDashboardRoute} from './partner-dashboard.mjs';
 import {referralToken} from './affiliate-store.mjs';
 import {createRefundTracking} from './refund-tracking.mjs';
@@ -48,7 +49,8 @@ for (const store of stores) {
 }
 const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
-const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates});
+const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH):null;
+const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,payouts:manualPayouts});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
