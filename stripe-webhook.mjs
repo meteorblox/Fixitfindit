@@ -14,7 +14,7 @@ export function verifyStripeEvent(raw,header,secret,now=Date.now(),mode='sandbox
   return event;
 }
 
-export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRIPE_WEBHOOK_SECRET,resolveSession}={}) {
+export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRIPE_WEBHOOK_SECRET,resolveSession,refundTracking}={}) {
   return async(req,res,url)=>{
     if(url.pathname!=='/webhooks/stripe') return false;
     const send=code=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({received:code===200}));};
@@ -26,6 +26,7 @@ export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRI
       for await(const chunk of req) {const b=Buffer.from(chunk);size+=b.length;if(size>262144){send(413);return true;}chunks.push(b);}
       event=verifyStripeEvent(Buffer.concat(chunks),req.headers['stripe-signature'],secret);
     } catch {send(400);return true;}
+    if(['refund.created','refund.updated','refund.failed'].includes(event.type)){try{if(!refundTracking)throw Error('Refund tracking unavailable');await refundTracking.event(event);send(200);}catch{send(503);}return true;}
     const supported=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed','checkout.session.expired'];
     let session=event.data?.object;
     if(!supported.includes(event.type) || session?.metadata?.purpose!=='fixitfindit-product-sandbox' || !session.metadata.order_id) {send(200);return true;}

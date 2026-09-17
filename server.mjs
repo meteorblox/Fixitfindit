@@ -1,3 +1,5 @@
+import {createRefundTracking} from './refund-tracking.mjs';
+import {orders as refundOrders} from './orders.mjs';
 import {createProductionWebhookRoute} from './production-webhook.mjs';
 import {createOrderStore} from './orders.mjs';
 import {createProductionFulfillment} from './production-fulfillment.mjs';
@@ -22,7 +24,7 @@ import {createWebhookRoute} from './stripe-webhook.mjs';
 const catalog = createPricedCatalog(createCatalog(),{path:process.env.ORDERS_DB_PATH||':memory:'});
 const checkoutService=createCheckout();
 const productCheckoutRoute = createProductCheckoutRoute({catalog,checkout:checkoutService});
-const webhookRoute=createWebhookRoute({resolveSession:checkoutService.retrieve});
+const webhookRoute=createWebhookRoute({resolveSession:checkoutService.retrieve,refundTracking:refundOrders?createRefundTracking({orders:refundOrders,resolveSession:checkoutService.retrieve}):null});
 const liveIntake=process.env.LIVE_ORDER_INTAKE==='enabled' && Boolean(process.env.ORDERS_DB_PATH);
 const liveOrders=liveIntake?createOrderStore(process.env.ORDERS_DB_PATH,{mode:'live'}):null;
 const liveWorker=liveIntake?createProductionFulfillment({path:process.env.ORDERS_DB_PATH,orders:liveOrders,catalog,cj:createProductionCj(),enabled:false}):null;

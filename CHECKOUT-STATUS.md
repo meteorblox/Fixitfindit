@@ -75,3 +75,7 @@ This is not live activation. Stripe live keys remain rejected. CJ freight still 
 ## Returns policy — September 16, 2026
 
 Owner chose supplier-backed coverage without a voluntary change-of-mind program. The /returns page now provides support instructions, issue coverage, cancellation and return guidance, while clearly remaining a planned launch policy. Current CJ terms were reviewed; customer remedies and supplier recovery are separate. REFUND-OPERATIONS.md records the private support workflow and remaining refund reconciliation/fulfillment safeguards. No refund API or real payment was invoked. Publishing policy text does not finish the refund implementation.
+
+## Sandbox refund tracking — September 16, 2026
+
+Persistent order-linked refund ledger and private read-only sync/status CLI added. Signed refund notifications trigger an authenticated paginated Stripe refresh; amounts/mode/payment identity are checked, stale concurrent refreshes rejected, missing prior refunds rejected, and duplicate notifications do not double-count. Known refund activity holds further supplier submission/payment for review. Full and partial totals remain separate from original payment status; failed/canceled amounts are excluded from successful totals. This does not issue refunds, cancel CJ shipments, reconcile supplier reimbursements, or implement affiliate reversals. Live refund intake remains disabled/unwired. Configure sandbox webhook events refund.created, refund.updated and refund.failed before automatic delivery verification.

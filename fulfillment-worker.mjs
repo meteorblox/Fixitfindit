@@ -19,6 +19,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
   return {
     sync,
     async submit(id) {
+      if(orders.refunds?.summary(id).fulfillmentHold)throw Error('Refund review holds fulfillment');
       const job=requireJob(id);
       if(job.state!=='ready') return jobs.summary(id);
       if(!cj.enabled()) throw new Error('CJ sandbox fulfillment is not enabled.');
@@ -38,12 +39,14 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
       }
       // Persist the claim before any create call. An interrupted claim is never
       // automatically retried: sync uses the stable custom order number instead.
+      if(orders.refunds?.summary(id).fulfillmentHold)throw Error('Refund review holds fulfillment');
       if(!jobs.claim(id,'ready','creating')) return jobs.summary(id);
       try {jobs.created(id,await cj.create(payload));}
       catch {jobs.error(id,'creation_outcome_unknown');throw new Error('CJ submission outcome is uncertain. Run sync; do not create another order.');}
       return sync(id);
     },
     async simulatePayment(id) {
+      if(orders.refunds?.summary(id).fulfillmentHold)throw Error('Refund review holds fulfillment');
       await sync(id);
       let job=requireJob(id);
       if(job.state!=='created') return jobs.summary(id);
@@ -54,6 +57,7 @@ export function createFulfillmentWorker({orders,cj,catalog}) {
         await sync(id);job=requireJob(id);
       }
       if(job.state!=='created' || job.supplier_status!=='UNPAID') throw new Error('CJ must confirm the sandbox order is unpaid before simulated payment.');
+      if(orders.refunds?.summary(id).fulfillmentHold)throw Error('Refund review holds fulfillment');
       if(!jobs.claim(id,'created','paying')) return jobs.summary(id);
       try {await cj.simulatePayment(job.cj_order_id);}
       catch {jobs.error(id,'payment_outcome_unknown');throw new Error('Sandbox payment outcome is uncertain. Run sync before any further action.');}

@@ -15,4 +15,13 @@ Live sales remain disabled. Publishing this draft does not enable refunds or com
 
 ## Remaining launch work
 
-The application does not yet persist a refund ledger, consume refund lifecycle events or stop fulfillment automatically on refund. Its existing paid status is not proof that a payment remains unrefunded. Refund reconciliation and fulfillment holds must be implemented and sandbox-tested before live activation. Real refunds need exact order/amount authorization; this workflow grants no real-money authorization.
+Sandbox refund tracking now persists refund IDs, amounts, current statuses, failure reasons and last reconciliation time. The signed sandbox webhook accepts refund.created, refund.updated and refund.failed and retrieves the current complete refund list from Stripe. Add those three event types to the sandbox webhook destination. Known refund activity holds subsequent supplier submission/payment for manual review; it does not cancel an existing CJ order or recall a shipment. The hold stays set even if a refund fails. Concurrent external CJ/payment activity is not atomic. Live refund event wiring and a reviewed hold-release process remain launch work. Real refunds need exact order/amount authorization; this workflow grants no real-money authorization.
+
+## Private read-only refund tools
+
+Run on the Railway service with its persistent volume and Stripe test key:
+
+- node refund-cli.mjs sync ORDER_ID — read Stripe, backfill a historical payment link, and persist the complete refund history.
+- node refund-cli.mjs status ORDER_ID — show locally recorded totals, statuses and the last check time. An unchecked order has checkedAt: null; a zero total is not evidence of a recent Stripe check.
+
+Only GET requests are made to Stripe. These commands never issue a refund. Retry sync after API errors; the previous ledger remains intact. Supplier reimbursements are not inferred from Stripe refunds. Affiliate accounting must consume refund records when implemented.
