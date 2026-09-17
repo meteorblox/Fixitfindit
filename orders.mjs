@@ -74,7 +74,7 @@ export function createOrderStore(path,{mode='sandbox'}={}) {
       return {id:row.id,status};
     } catch(error) {db.exec('ROLLBACK');throw error;}
   }
-  return {mode,prepare,recordSession,fulfillment,refunds,affiliates,get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
+  return {mode,prepare,recordSession,fulfillment,refunds,affiliates,listPaid:()=>db.prepare('SELECT id,product_name,retail_cents,tax_cents,total_cents,created_at FROM orders WHERE mode=? AND status=? ORDER BY created_at DESC LIMIT 200').all(mode,paidStatus),get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
 }
 
 // No temporary disk fallback: without a configured mount, existing sandbox

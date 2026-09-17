@@ -1,0 +1,2 @@
+import {createOwnerAccess,owner} from './owner-orders.mjs';
+let access;try{if(!process.env.ORDERS_DB_PATH)throw Error('Persistent storage required');const action=process.argv[2];if(!['issue','revoke'].includes(action))throw Error('Usage: node owner-access-cli.mjs issue|revoke');access=createOwnerAccess(process.env.ORDERS_DB_PATH);if(action==='issue')console.log('One-time owner code (24 hours): '+access.issue(owner));else{access.revoke(owner.id);console.log('Owner access revoked');}}catch(e){console.error(e.message);process.exitCode=1;}finally{access?.close();}

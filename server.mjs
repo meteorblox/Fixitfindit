@@ -1,3 +1,4 @@
+import {createOwnerAccess,createOwnerOrdersRoute} from './owner-orders.mjs';
 import {createManualPayouts} from './manual-payouts.mjs';
 import {createDashboardAccess,createDashboardRoute} from './partner-dashboard.mjs';
 import {referralToken} from './affiliate-store.mjs';
@@ -31,6 +32,8 @@ const webhookRoute=createWebhookRoute({resolveSession:checkoutService.retrieve,r
 const liveIntake=process.env.LIVE_ORDER_INTAKE==='enabled' && Boolean(process.env.ORDERS_DB_PATH);
 const liveOrders=liveIntake?createOrderStore(process.env.ORDERS_DB_PATH,{mode:'live'}):null;
 const liveWorker=liveIntake?createProductionFulfillment({path:process.env.ORDERS_DB_PATH,orders:liveOrders,catalog,cj:createProductionCj(),enabled:false}):null;
+const ownerAccess=liveIntake?createOwnerAccess(process.env.ORDERS_DB_PATH):null;
+const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker});
 const liveReady=liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
 const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
@@ -101,6 +104,7 @@ export const server = http.createServer(async (req, res) => {
   };
   const referralPath=new URL(req.url,'http://localhost').pathname.match(/^\/shop\/([a-z0-9-]+)(?:\/|$)/);
   if(req.method==='GET'&&referralPath&&refundOrders){const partner=findPartner(referralPath[1]);if(partner){try{const token=refundOrders.affiliates.visit(partner);res.setHeader('Set-Cookie','fit_referral='+token+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');}catch{/* Store browsing remains available if referral storage fails. */}}}
+  if (await ownerRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await dashboardRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
