@@ -1,3 +1,4 @@
+import {createDashboardAccess,createDashboardRoute} from './partner-dashboard.mjs';
 import {referralToken} from './affiliate-store.mjs';
 import {createRefundTracking} from './refund-tracking.mjs';
 import {orders as refundOrders} from './orders.mjs';
@@ -46,6 +47,8 @@ for (const store of stores) {
   slugs.add(store.slug); ids.add(store.id);
 }
 const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
+const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
+const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
@@ -92,6 +95,7 @@ export const server = http.createServer(async (req, res) => {
   };
   const referralPath=new URL(req.url,'http://localhost').pathname.match(/^\/shop\/([a-z0-9-]+)(?:\/|$)/);
   if(req.method==='GET'&&referralPath&&refundOrders){const partner=findPartner(referralPath[1]);if(partner){try{const token=refundOrders.affiliates.visit(partner);res.setHeader('Set-Cookie','fit_referral='+token+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');}catch{/* Store browsing remains available if referral storage fails. */}}}
+  if (await dashboardRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productionWebhook(req,res,new URL(req.url,'http://localhost'))) return;

@@ -1,0 +1,3 @@
+import {createDashboardAccess} from './partner-dashboard.mjs';
+import {partnerStore} from './partner-applications.mjs';
+let access;try{if(!process.env.ORDERS_DB_PATH||!partnerStore)throw Error('Persistent database required');const [action,slug]=process.argv.slice(2),p=partnerStore.find(slug);if(!p||!['issue','revoke'].includes(action))throw Error('Usage: node partner-access-cli.mjs issue|revoke APPROVED_PARTNER_SLUG');access=createDashboardAccess(process.env.ORDERS_DB_PATH);if(action==='issue')console.log('One-time code (24 hours): '+access.issue(p));else{access.revoke(p.id);console.log('Access revoked');}}catch(e){console.error(e.message);process.exitCode=1;}finally{access?.close();partnerStore?.close();}
