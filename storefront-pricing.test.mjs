@@ -39,3 +39,8 @@ test('missing destination quotes and unknown stock never produce upfront prices;
  }
  const approved={id:'approved',retailCents:2350,pricedVariants:[{id:'silver',retailCents:2350}]};const catalog=createPricedCatalog({list:async()=>({products:[approved]}),detail:()=>assert.fail('Approved pricing must not be regenerated')});try{assert.deepEqual((await catalog.list('kitchen')).products[0],approved);await catalog.settled();}finally{catalog.close();}
 });
+
+test('an unshippable cheap option does not hide another complete stocked option',async()=>{
+ const raw=supplier();raw.detail=async()=>({origin:'US',variants:[{id:'cheap',name:'Red',stock:4,price:100},{id:'blue',name:'Blue',stock:4,price:500}]});const ship=raw.shipping;raw.shipping=async(c,p,v,z)=>v==='cheap'?[]:ship(c,p,v,z);
+ const catalog=createPricedCatalog(raw);try{await catalog.list('cleaning');await catalog.settled();assert.equal((await catalog.list('cleaning')).products[0].storefrontVariants[0].id,'blue');}finally{catalog.close();}
+});

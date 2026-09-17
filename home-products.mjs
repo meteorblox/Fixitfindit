@@ -12,7 +12,7 @@ export async function homeProducts(catalog, prefix = '') {
     let products = [];
     try {
       const result = await catalog.list(slug);
-      products = result.products.filter(p=>p.image && !used.has(p.id)).slice(0,4);
+      products = result.products.filter(p=>p.image && retailPrice(p) && !used.has(p.id)).slice(0,4);
     } catch { /* One unavailable category must not prevent the homepage from loading. */ }
     products.forEach(p=>used.add(p.id));
     const categoryUrl = `${prefix}/category/${slug}`;

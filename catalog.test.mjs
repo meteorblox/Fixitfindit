@@ -22,8 +22,15 @@ test('supplier failures are sanitized and cached',async()=>{
   await assert.rejects(service.list('anything'),/Unknown category/);
 });
 test('partner category links retain storefront and escape product text',()=>{
-  const html=catalogPage('<head></head><main id="top"></main>',{store:{slug:'home-helper'},category:{slug:'tools',name:'Tools'},data:{updatedAt:'today',products:[{id:'p1',name:'<script>oops</script>',supplierPrice:'2',image:'',listings:5}]}});
+  const html=catalogPage('<head></head><main id="top"></main>',{store:{slug:'home-helper'},category:{slug:'tools',name:'Tools'},data:{updatedAt:'today',products:[{id:'p1',name:'<script>oops</script>',retailCents:2300,supplierPrice:'2',image:'',listings:5}]}});
   assert.ok(html.includes('/shop/home-helper/category/tools/product/p1'));
   assert.ok(!html.includes('<script>oops'));
   assert.equal(safeImage('http://example.com/image.jpg'),'');
+});
+
+test('expanded US collections page through results and deduplicate supplier IDs',async()=>{
+ for(const slug of ['cleaning','organization']) {
+ const pages=[];const catalog=createCatalog({apiKey:'fixture',interval:0,request:async(url)=>({ok:true,json:async()=>{if(url.includes('getAccessToken'))return {result:true,data:{accessToken:'fixture'}};const q=new URL(url).searchParams;pages.push(q.get('page'));assert.equal(q.get('verifiedWarehouse'),'1');assert.equal(q.get('countryCode'),'US');return {result:true,data:{totalPages:3,content:[{productList:Array.from({length:24},(_,i)=>({id:i===0?'shared':q.get('page')+'-'+i,nameEn:'Household organizer'}))}]}};}})});
+ const data=await catalog.list(slug);assert.deepEqual(pages,['1','2','3']);assert.equal(data.products.length,70);
+ }
 });
