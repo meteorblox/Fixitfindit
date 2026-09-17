@@ -31,7 +31,11 @@ const webhookRoute=createWebhookRoute({resolveSession:checkoutService.retrieve,r
 const liveIntake=process.env.LIVE_ORDER_INTAKE==='enabled' && Boolean(process.env.ORDERS_DB_PATH);
 const liveOrders=liveIntake?createOrderStore(process.env.ORDERS_DB_PATH,{mode:'live'}):null;
 const liveWorker=liveIntake?createProductionFulfillment({path:process.env.ORDERS_DB_PATH,orders:liveOrders,catalog,cj:createProductionCj(),enabled:false}):null;
-const productionWebhook=createProductionWebhookRoute({orders:liveOrders,worker:liveWorker,secret:process.env.STRIPE_LIVE_WEBHOOK_SECRET,enabled:liveIntake});
+const liveReady=liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
+const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
+const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
+const liveCheckoutRoute=createProductCheckoutRoute({catalog,checkout:liveCheckout,mode:'live',resolvePartner:req=>liveOrders?.affiliates.resolve(referralToken(req),findPartner)});
+const productionWebhook=createProductionWebhookRoute({orders:liveOrders,worker:liveWorker,secret:process.env.STRIPE_LIVE_WEBHOOK_SECRET,enabled:liveIntake,resolveSession:liveCheckout.retrieve,refundTracking:liveRefundTracking});
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const template = await readFile(new URL('index.html', import.meta.url), 'utf8');
@@ -102,6 +106,7 @@ export const server = http.createServer(async (req, res) => {
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productionWebhook(req,res,new URL(req.url,'http://localhost'))) return;
   if (await webhookRoute(req,res,new URL(req.url,'http://localhost'))) return;
+  if (await liveCheckoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productCheckoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {

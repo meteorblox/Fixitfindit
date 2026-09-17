@@ -3,10 +3,17 @@ import { randomUUID } from 'node:crypto';
 import {orders as defaultOrders} from './orders.mjs';
 import {paymentTotals} from './payment-totals.mjs';
 
-export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = fetch,orders=defaultOrders,now=Date.now} = {}) {
-  const enabled = () => typeof key === 'string' && key.startsWith('sk_test_');
+export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = fetch,orders=defaultOrders,now=Date.now,mode='sandbox',allowLive=false} = {}) {
+  if(!['sandbox','live'].includes(mode))throw Error('Invalid checkout mode');
+  const live=mode==='live',sessionPattern=live?/^cs_live_[a-zA-Z0-9]+$/:/^cs_test_[a-zA-Z0-9]+$/;
+  const purpose=live?'fixitfindit-product-live':'fixitfindit-product-sandbox';
+  const fulfillment=live?'production-review':'sandbox-do-not-ship';
+  const checkoutPath=live?'/checkout/live':'/checkout/products';
+  const configured = () => typeof key === 'string' && key.startsWith(live?'sk_live_':'sk_test_') && (!live||orders?.mode==='live');
+  const enabled = () => configured() && (!live||allowLive);
+
   async function call(path, body, idempotency,resource='checkout/sessions') {
-    if (!enabled()) throw new Error('Sandbox checkout is not configured.');
+    if (!configured()) throw new Error('Sandbox checkout is not configured.');
     const response = await request('https://api.stripe.com/v1/'+resource + path, {
       method: body ? 'POST' : 'GET',
       headers: {Authorization: `Bearer ${key}`, ...(body ? {'Content-Type':'application/x-www-form-urlencoded', 'Idempotency-Key':idempotency} : {})},
@@ -14,24 +21,25 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
     });
     if (!response.ok) throw new Error('Stripe could not complete this sandbox request. Please try again.');
     const session = await response.json();
-    if (session.livemode !== false) throw new Error('Only sandbox sessions are allowed.');
+    if (session.livemode !== live) throw new Error('Only sandbox sessions are allowed.');
     return session;
   }
   async function retrieve(id) {
-    if(!/^cs_test_[a-zA-Z0-9]+$/.test(id||''))throw new Error('Invalid session');
+    if(!sessionPattern.test(id||''))throw new Error('Invalid session');
     const s=await call('/'+id+'?expand[]=customer');
     if(s.metadata?.address_mode==='fixed'&&s.status==='complete') {
-      if(s.customer?.livemode!==false||!s.customer.shipping)throw new Error('Verified delivery address unavailable');
+      if(s.customer?.livemode!==live||!s.customer.shipping)throw new Error('Verified delivery address unavailable');
       s.collected_information={...s.collected_information,shipping_details:s.customer.shipping};
     }
     return s;
   }
   return {
-    enabled,retrieve,
+    enabled,retrieve,mode,
     async startProduct(origin, reference, item) {
       if(!enabled()) throw new Error('Sandbox checkout is not configured.');
       if (!Number.isInteger(item.retailCents) || item.retailCents < 1 || !item.variantId || !item.productId) throw new Error('Invalid product selection.');
       if(item.shipping && (!orders || !Number.isSafeInteger(item.shipping.cents)||item.shipping.cents<0||!item.shipping.name||!/^\d{5}$/.test(item.shipping.zip)||!item.quoteId)) throw new Error('Shipping checkout requires a valid quote and order storage.');
+      if(live&&!item.shipping?.recipient)throw Error('A verified delivery quote is required');
       const order=orders?.prepare(reference,{...item,automaticTax:true});
       if(order?.session_id){const existing=await retrieve(order.session_id);if(existing.status!=='open'||!existing.url?.startsWith('https://checkout.stripe.com/'))throw new Error('Start a new checkout');return existing.url;}
       const deadline=Math.floor((order?Date.parse(order.created_at):now())/1000)+1860;
@@ -60,28 +68,28 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
           'metadata[shipping_zip]':item.shipping.zip,
           'metadata[quote_id]':item.quoteId
         }:{}),
-        'line_items[0][price_data][product_data][name]':item.name+' — SANDBOX, no shipment',
+        'line_items[0][price_data][product_data][name]':item.name+(live?'':' — SANDBOX, no shipment'),
         'line_items[0][quantity]':'1',
-        'metadata[purpose]':'fixitfindit-product-sandbox',
+        'metadata[purpose]':purpose,
         'metadata[product_id]':item.productId,'metadata[variant_id]':item.variantId,
         'metadata[retail_cents]':String(item.retailCents),'metadata[quantity]':'1',
         ...(order?.partner_id?{'metadata[partner_id]':order.partner_id}:{}),
-        'metadata[store_id]':'fixitfindit','metadata[fulfillment]':'sandbox-do-not-ship',
+        'metadata[store_id]':'fixitfindit','metadata[fulfillment]':fulfillment,
         ...(order?{'metadata[order_id]':order.id}:{}),
-        'custom_text[submit][message]':'Test only. No shipment or commission. Applicable tax is calculated from the shipping address.',
+        'custom_text[submit][message]':live?'Standard shipping included. Applicable sales tax is shown above.':'Test only. No shipment or commission. Applicable tax is calculated from the shipping address.',
         client_reference_id:reference,
-        success_url:origin+'/checkout/products/result?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url:origin+'/checkout/products?cancelled=1'
+        success_url:origin+checkoutPath+'/result?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url:origin+checkoutPath+'?cancelled=1'
       },order?.id || reference+':'+item.variantId);
       if (!session.url?.startsWith('https://checkout.stripe.com/')) throw new Error('Invalid checkout destination.');
       if(order) orders.recordSession(session);
       return session.url;
     },
     async verifyProduct(id, reference) {
-      if (!/^cs_test_[a-zA-Z0-9]+$/.test(id || '')) throw new Error('Invalid test session.');
+      if (!sessionPattern.test(id || '')) throw new Error('Invalid checkout session.');
       const s=await retrieve(id);
       const m=s.metadata||{};
-      if(s.client_reference_id!==reference || m.purpose!=='fixitfindit-product-sandbox' || m.fulfillment!=='sandbox-do-not-ship' || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.currency!=='usd') throw new Error('Product payment could not be verified.');
+      if(s.client_reference_id!==reference || m.purpose!==purpose || m.fulfillment!==fulfillment || m.quantity!=='1' || !m.product_id || !m.variant_id || !/^\d+$/.test(m.retail_cents||'') || Number(m.retail_cents)<1 || s.currency!=='usd') throw new Error('Product payment could not be verified.');
       const shippingCents=m.shipping_cents===undefined?0:/^\d+$/.test(m.shipping_cents)?Number(m.shipping_cents):NaN;
       const totals=paymentTotals(s,Number(m.retail_cents),m.tax_mode==='automatic',shippingCents);
       const address=s.collected_information?.shipping_details?.address||s.shipping_details?.address;
@@ -92,6 +100,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
       return {fulfillment:m.order_id?orders?.fulfillment?.summary(m.order_id):null,shippingCents,destinationMatches,paid:s.status==='complete' && s.payment_status==='paid',productId:m.product_id,variantId:m.variant_id,retailCents:Number(m.retail_cents),...totals,orderId:m.order_id||null,webhookReceived:Boolean(m.order_id && orders?.hasWebhook(m.order_id))};
     },
     async start(origin, reference) {
+      if(live)throw Error('Sandbox test is unavailable in live mode');
       const session = await call('', {
         mode:'payment', 'payment_method_types[0]':'card',
         'line_items[0][price_data][currency]':'usd',
