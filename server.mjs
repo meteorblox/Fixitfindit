@@ -1,4 +1,4 @@
-import {infoPages,infoPage,infoFooter} from './info-pages.mjs';
+import {infoPages,infoPage,infoMenu} from './info-pages.mjs';
 import {partnerStore} from './partner-applications.mjs';
 import {applicationRoute} from './partner-application-route.mjs';
 import http from 'node:http';
@@ -50,7 +50,7 @@ export function renderStore(store) {
     .replace('Independent picks · Easy  checkout · Everyday Deals','Small fixes. Better home.')
     .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
     .replace('href="#organize"','href="'+prefix+'/category/organization"');
-  html = html.replace('<div class="copyright shell">',infoFooter+'<div class="copyright shell">');
+  html = html.replace('<!-- store-information-menu -->',infoMenu);
   if (!store) return html;
   const name = escape(store.name);
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
