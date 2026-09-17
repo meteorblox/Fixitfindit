@@ -15,6 +15,7 @@ export function createPartnerStore(path) {
   if(v.website && !/^https?:\/\//i.test(v.website)) throw new Error('Use a full website or social profile URL starting with https://.');
   db.prepare('INSERT OR IGNORE INTO partner_applications(id,email,name,brand,website,created_at) VALUES(?,?,?,?,?,?)').run(randomUUID(),v.email,v.name,v.brand,v.website,new Date().toISOString());
  },
+ approvedEmail(email){return db.prepare("SELECT id,email,slug FROM partner_applications WHERE email=? AND status='approved'").get(String(email||'').trim().toLowerCase());},
  list(){return db.prepare('SELECT * FROM partner_applications ORDER BY created_at DESC').all();},
  approve(id,slug){if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||slug.length>60||slug==='home-helper')throw new Error('Choose a unique lowercase storefront slug.');const r=db.prepare("UPDATE partner_applications SET status='approved',slug=? WHERE id=? AND status='pending'").run(slug,id);if(!r.changes)throw new Error('Pending application not found.');},
  find(slug){const r=db.prepare("SELECT id,brand,slug,(SELECT version FROM partner_logos WHERE partner_id=partner_applications.id) logo_version FROM partner_applications WHERE slug=? AND status='approved'").get(slug);return r?{id:r.id,slug:r.slug,name:r.brand,logoUrl:r.logo_version?'/partner-logos/'+r.slug+'?v='+r.logo_version:null,tagline:'Useful finds for your home.',accent:'#167164',demo:false}:undefined;},

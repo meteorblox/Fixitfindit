@@ -1,3 +1,5 @@
+import {createPartnerEmailLogin} from './partner-email.mjs';
+import {createPartnerEmailRoute} from './partner-email-route.mjs';
 import {createOwnerEmailLogin} from './owner-email.mjs';
 import {createTrackingSync} from './tracking-sync.mjs';
 import {salesOpen,launchCopy,purchaseLink} from './launch-presentation.mjs';
@@ -69,6 +71,8 @@ const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
 const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH,{affiliates:liveOrders?.affiliates}):null;
 const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker,tracking:trackingSync,emailLogin:ownerEmail,partners:partnerStore,payouts:manualPayouts});
+const partnerEmail=process.env.ORDERS_DB_PATH?createPartnerEmailLogin({path:process.env.ORDERS_DB_PATH,partners:partnerStore}):null;
+const partnerEmailRoute=createPartnerEmailRoute({emailLogin:partnerEmail,access:dashboardAccess,findPartner});
 const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts,branding:partnerStore});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
@@ -120,6 +124,7 @@ export const server = http.createServer(async (req, res) => {
   if(req.method==='GET'&&referralPath&&refundOrders){const partner=findPartner(referralPath[1]);if(partner){try{const token=refundOrders.affiliates.visit(partner);res.setHeader('Set-Cookie','fit_referral='+token+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');}catch{/* Store browsing remains available if referral storage fails. */}}}
   if (await trackingRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await ownerRoute(req,res,new URL(req.url,'http://localhost'))) return;
+  if (await partnerEmailRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await dashboardRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;

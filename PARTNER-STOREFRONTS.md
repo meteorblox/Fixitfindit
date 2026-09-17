@@ -52,3 +52,7 @@ This supersedes the earlier note that custom logo uploads were unavailable. The 
 ## Owner affiliate management — 2026-09-17
 
 The owner dashboard now links Orders and Affiliates under the same owner login. /owner/orders/affiliates privately lists applications and live earnings, recorded manual payouts, refund holds and saved PayPal destinations. Pending applications can be approved with a unique storefront slug using an owner-authenticated CSRF-protected form. Approval does not email access credentials, send money or change payout policy. Partner dashboard access codes and payout execution remain the existing operator/manual workflows. No real applications were approved during verification.
+
+## Partner email sign-in — 2026-09-17
+
+Approved partners request their own sign-in link at /partners/dashboard using their application email. This replaces the normal operator-issued code workflow. Uses existing RESEND_API_KEY and OWNER_EMAIL_FROM; no additional Railway variables are required. Pending and unknown addresses receive the same generic page response without email. Links are hashed in persistent SQLite, expire after 15 minutes, and are consumed once by a CSRF-protected confirmation POST. GET requests do not consume links. Successful sign-in rechecks approval and scopes the session to that partner. Requests are limited to one per minute and five per hour per partner. Existing operator codes remain a recovery path. No real applications were approved or affiliate emails sent during automated verification.
