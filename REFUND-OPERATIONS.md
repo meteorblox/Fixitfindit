@@ -15,7 +15,7 @@ Live sales remain disabled. Publishing this draft does not enable refunds or com
 
 ## Remaining launch work
 
-Sandbox refund tracking now persists refund IDs, amounts, current statuses, failure reasons and last reconciliation time. The signed sandbox webhook accepts refund.created, refund.updated and refund.failed and retrieves the current complete refund list from Stripe. Add those three event types to the sandbox webhook destination. Known refund activity holds subsequent supplier submission/payment for manual review; it does not cancel an existing CJ order or recall a shipment. The hold stays set even if a refund fails. Concurrent external CJ/payment activity is not atomic. Live refund event wiring and a reviewed hold-release process remain launch work. Real refunds need exact order/amount authorization; this workflow grants no real-money authorization.
+Sandbox refund tracking now persists refund IDs, amounts, current statuses, failure reasons and last reconciliation time. The signed sandbox webhook accepts refund.created, refund.updated and refund.failed and retrieves the current complete refund list from Stripe. Those three event types are configured on the sandbox webhook destination. Known refund activity holds subsequent supplier submission/payment for manual review; it does not cancel an existing CJ order or recall a shipment. The hold stays set even if a refund fails. Concurrent external CJ/payment activity is not atomic. Live refund event wiring and a reviewed hold-release process remain launch work. Real refunds need exact order/amount authorization; this workflow grants no real-money authorization.
 
 ## Private read-only refund tools
 
