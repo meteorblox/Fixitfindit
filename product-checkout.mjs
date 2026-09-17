@@ -1,11 +1,11 @@
 import {isReplacementPart} from './catalog-policy.mjs';
-import {automaticRetail,eligibleMethod} from './automatic-pricing.mjs';
+import {automaticRetail,eligibleMethod,minimumContributionCents} from './automatic-pricing.mjs';
 import {categories} from './catalog.mjs';
 import {randomUUID} from 'node:crypto';
 import {createCheckout} from './checkout.mjs';
 import {shippingQuotes} from './shipping-quotes.mjs';
 import {selectedProducts} from './selected-products.mjs';
-import {includedShipping,requireIncludedMargin} from './pricing-policy.mjs';
+import {includedShipping,requireIncludedMargin,contribution} from './pricing-policy.mjs';
 
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=c=>'$'+(c/100).toFixed(2);
@@ -25,7 +25,9 @@ export async function checkoutItem(catalog, variantId, context={}) {
       const details=await catalog.detail(context.category,context.productId);
       const actual=details.variants.find(v=>v.id===variantId);
       if(!actual || isReplacementPart(actual.name) || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('Stock or cost unavailable');
-      return {productId:product.id,variantId,name:product.name+' · '+actual.name,category:context.category,origin:details.origin,supplierCents:actual.price,retailCents:null,automatic:true};
+      const fixed=catalog.storefrontPrice?.(product.id,variantId);
+      if(catalog.storefrontPrice && !fixed) throw new Error('Published price unavailable');
+      return {productId:product.id,variantId,name:product.name+' · '+actual.name,category:context.category,origin:details.origin,supplierCents:actual.price,retailCents:fixed?.retailCents??null,fixedRetail:Boolean(fixed),automatic:true};
     }
   }
   const product=selectedProducts.find(p=>p.pricedVariants?.some(v=>v.id===variantId));
@@ -103,6 +105,7 @@ export function createProductCheckoutRoute({catalog,checkout=createCheckout(),qu
 
 export function quoteItem(item,method,zip) {
   if(!eligibleMethod(method)) return null;
-  const retailCents=item.automatic?automaticRetail(item.supplierCents,method.totalCents):item.retailCents;
+  const retailCents=item.automatic&&!item.fixedRetail?automaticRetail(item.supplierCents,method.totalCents):item.retailCents;
+  if(item.automatic && contribution(retailCents,item.supplierCents,method.totalCents)<minimumContributionCents) return null;
   return includedShipping({...item,retailCents},method,zip);
 }

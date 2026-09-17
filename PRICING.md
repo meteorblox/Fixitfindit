@@ -21,3 +21,11 @@ This is catalog quote support, not production checkout enablement. General catal
 Customer support contact supplied by the owner: fixitfindits@gmail.com. Published on Contact; mailbox delivery has not been tested.
 
 Automatic pricing was raised from 100% to 150% markup, with an $8 modeled contribution floor, at the owner’s request for higher catalog prices. The three manual product prices retain their existing $5 margin guard. This is a pricing choice, not a market-validated optimum or a guarantee of profit. Stored automatic quotes are recalculated before session creation; old lower quotes require a fresh quote. Already-created Stripe sandbox sessions keep their original price.
+
+## Upfront storefront prices
+
+The deployed catalog wrapper builds one named, in-stock complete-product option per automatic product. It checks eligible total freight to 10001, 60601 and 90210, uses the highest cheapest eligible quote plus a 25% freight buffer, then applies the 150% markup and $8 modeled contribution floor. This is a sampled allowance, not a nationwide shipping guarantee. All three samples must succeed. No prices are invented for unknown stock/costs or missing shipping estimates.
+
+Snapshots persist for 24 hours in storefront_prices in the existing Railway SQLite volume. Refresh runs serially in the background at startup and when catalog pages are visited. A first run takes time; pending/unavailable products show Temporarily unavailable. Failed attempts retry after one hour on a subsequent catalog request. One named option is initially offered per automatic product; complete-product stock and costs are still checked before checkout. Existing manual prices and variant choices remain intact.
+
+Customer ZIP checks and sandbox checkout use the published price, never silently change it based on destination. Automatic orders must retain at least $8 modeled contribution using actual quoted freight; ineligible destinations are blocked. Expired snapshots require fresh prices. General catalog supplier fulfillment and real payments remain disabled.

@@ -1,3 +1,4 @@
+import {createPricedCatalog} from './storefront-pricing.mjs';
 import {infoPages,infoPage,infoMenu} from './info-pages.mjs';
 import {partnerStore} from './partner-applications.mjs';
 import {applicationRoute} from './partner-application-route.mjs';
@@ -14,7 +15,7 @@ import { checkoutRoute } from './checkout.mjs';
 import { productOptions } from './product-options.mjs';
 import { createProductCheckoutRoute } from './product-checkout.mjs';
 import {createWebhookRoute} from './stripe-webhook.mjs';
-const catalog = createCatalog();
+const catalog = createPricedCatalog(createCatalog(),{path:process.env.ORDERS_DB_PATH||':memory:'});
 const productCheckoutRoute = createProductCheckoutRoute({catalog});
 const webhookRoute=createWebhookRoute();
 
@@ -108,7 +109,7 @@ export const server = http.createServer(async (req, res) => {
         }
         page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
         if(!store && !product.checkoutHold && options.details) {
-          const available=product.pricedVariants||options.details.variants.filter(v=>Number.isSafeInteger(v.stock)&&v.stock>0&&Number.isSafeInteger(v.price));
+          const available=product.pricedVariants||product.storefrontVariants||(product.pricingPending?[]:options.details.variants.filter(v=>Number.isSafeInteger(v.stock)&&v.stock>0&&Number.isSafeInteger(v.price)));
           const chosen=available.find(v=>v.id===options.vid)||available[0];
           if(chosen)
           page=page.replace('<strong>Not available to purchase yet</strong>',`<p><a href="/checkout/products?variant=${encodeURIComponent(chosen.id)}&amp;product=${encodeURIComponent(product.id)}&amp;category=${encodeURIComponent(category.slug)}&amp;zip=${encodeURIComponent(options.zip)}">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>`);
@@ -127,5 +128,8 @@ export const server = http.createServer(async (req, res) => {
   }
 });
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if(process.env.CJ_API_KEY) {
+    void (async()=>{for(const c of categories) {try {await catalog.list(c.slug);} catch {}}})().catch(()=>{});
+  }
   server.listen(Number(process.env.PORT || 8080), '0.0.0.0', () => console.log('FixItFindIt storefront server ready'));
 }

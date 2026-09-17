@@ -6,7 +6,7 @@ test('product rows preserve partner links, escape titles and deduplicate',async(
   assert.equal((html.match(/class="home-product-card"/g)||[]).length,1);
   assert.ok(html.includes('/shop/home-helper/category/cleaning/product/one'));
   assert.ok(!html.includes('<img onerror'));
-  assert.ok(html.includes('Check delivered price'));
+  assert.ok(html.includes('Temporarily unavailable'));
   assert.ok(!html.includes('2.00'));assert.ok(!html.includes('CJ supplier price'));
 });
 test('unavailable categories show honest fallback',async()=>{

@@ -20,15 +20,16 @@ export function automaticRetail(supplierCents,freightCents) {
   return price;
 }
 export function deliveredPrice({product,details,vid,zip,shipping,quantity=1}) {
-  if(quantity!==1 || product?.checkoutHold || !/^\d{5}$/.test(zip||'')) return null;
+  if(quantity!==1 || product?.pricingPending || product?.checkoutHold || !/^\d{5}$/.test(zip||'')) return null;
   const actual=details?.variants.find(v=>v.id===vid);
   if(!actual || isReplacementPart(actual.name) || isReplacementPart(product?.name) || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) return null;
-  const approved=product?.pricedVariants?.find(v=>v.id===vid);
+  const approved=(product?.pricedVariants||product?.storefrontVariants)?.find(v=>v.id===vid);
   // Manual products retain their exact approved options, including multipack exclusions.
-  if(product?.pricedVariants && !approved) return null;
+  if((product?.pricedVariants||product?.storefrontVariants) && !approved) return null;
   for(const method of (shipping||[]).filter(eligibleMethod).sort((a,b)=>a.totalCents-b.totalCents)) {
     if(actual.price+method.totalCents>10000000) continue;
     const retailCents=approved?.retailCents ?? automaticRetail(actual.price,method.totalCents);
+    if(product?.storefrontVariants && contribution(retailCents,actual.price,method.totalCents)<minimumContributionCents) continue;
     const quote=includedShipping({retailCents,supplierCents:actual.price,origin:details.origin},method,zip);
     if(quote) return {...quote,variantId:vid,automatic:!approved};
   }
