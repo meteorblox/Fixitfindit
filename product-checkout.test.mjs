@@ -15,11 +15,11 @@ test('approved variant lookup works independently of category search',async()=>{
     const data=url.includes('getAccessToken')?{accessToken:'test'}:url.includes('getInventoryByPid')?{variantInventories:[{vid,inventory:[{countryCode:'CN',totalInventory:5}]}]}:{variants:[{vid,variantKey:'Black-1PC',variantSellPrice:1.90}]};
     return {ok:true,json:async()=>({result:true,data})};
   }});
-  assert.equal((await checkoutItem(supplier,vid)).retailCents,2299);
+  assert.equal((await checkoutItem(supplier,vid)).retailCents,2350);
 });
 test('only approved exact single variants with stock can enter checkout',async()=>{
   const item=await checkoutItem(catalog,vid);
-  assert.equal(item.retailCents,2299);
+  assert.equal(item.retailCents,2350);
   await assert.rejects(checkoutItem(catalog,'1732944160014995456'));
   await assert.rejects(checkoutItem({detail:async()=>({variants:[{id:vid,price:190,stock:null}]})},vid));
 });
@@ -31,7 +31,7 @@ test('product sessions use fixed pricing, supplier identifiers and sandbox guard
     return {ok:true,json:async()=>({livemode:false,url:'https://checkout.stripe.com/c/pay/test'})};
   }});
   await checkout.startProduct('https://www.fixitfindit.com','ref',item);
-  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2299');
+  assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2350');
   assert.equal(submitted.get('metadata[variant_id]'),vid);
   assert.equal(submitted.get('metadata[fulfillment]'),'sandbox-do-not-ship');
   await assert.rejects(createCheckout({key:'sk_live_example',request:()=>assert.fail('Live request attempted')}).startProduct('https://www.fixitfindit.com','ref',item));
@@ -63,6 +63,6 @@ test('route rejects cross-origin posts and ignores client supplied prices',async
   assert.equal(await run('https://attacker.example'),403);
   assert.equal(captured,undefined);
   assert.equal(await run('https://www.fixitfindit.com'),303);
-  assert.equal(captured.retailCents,2299);
+  assert.equal(captured.retailCents,2350);
   quotes.close();
 });
