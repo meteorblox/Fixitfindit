@@ -1,3 +1,4 @@
+import {salesOpen,launchCopy,purchaseLink} from './launch-presentation.mjs';
 import {createCustomerTracking,createTrackingRoute} from './customer-tracking.mjs';
 import {createOwnerAccess,createOwnerOrdersRoute} from './owner-orders.mjs';
 import {createManualPayouts} from './manual-payouts.mjs';
@@ -35,7 +36,7 @@ const liveOrders=liveIntake?createOrderStore(process.env.ORDERS_DB_PATH,{mode:'l
 const liveWorker=liveIntake?createProductionFulfillment({path:process.env.ORDERS_DB_PATH,orders:liveOrders,catalog,cj:createProductionCj(),enabled:false}):null;
 const ownerAccess=liveIntake?createOwnerAccess(process.env.ORDERS_DB_PATH):null;
 const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker});
-const liveReady=liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
+const liveReady=process.env.CJ_PRODUCTION_FULFILLMENT==='enabled' && liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
 const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
 const customerTracking=liveOrders?createCustomerTracking({path:process.env.ORDERS_DB_PATH,orders:liveOrders,worker:liveWorker}):null;
@@ -59,8 +60,8 @@ for (const store of stores) {
 }
 const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
-const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH):null;
-const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,payouts:manualPayouts});
+const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH,{affiliates:liveOrders?.affiliates}):null;
+const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
@@ -80,7 +81,7 @@ export function renderStore(store) {
     .replace('href="#kitchen"','href="'+prefix+'/category/kitchen"')
     .replace('href="#organize"','href="'+prefix+'/category/organization"');
   html = html.replace('<!-- store-information-menu -->',infoMenu);
-  if (!store) return html;
+  if (!store) return launchCopy(html,liveCheckout.enabled());
   const name = escape(store.name);
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
     .replace('</head>', `<meta name="robots" content="noindex,nofollow"><style>:root{--orange:${store.accent}}</style></head>`)
@@ -92,12 +93,12 @@ export function renderStore(store) {
   // Demo cards keep their information, but must not imply tracked or payable purchases.
   html = html.replace(/<a href="https:\/\/www\.(?:amazon|walmart)\.com[^>]*>([\s\S]*?)<\/a>/g,
     '<span class="demo-product-link">$1</span>');
-  return html;
+  return launchCopy(html,salesOpen(liveCheckout.enabled(),store));
 }
 
 async function renderHome(store) {
   const products = await homeProducts(catalog, store ? `/shop/${store.slug}` : '');
-  return renderStore(store).replace('</main>',`${products}</main>`);
+  return launchCopy(renderStore(store).replace('</main>',`${products}</main>`),salesOpen(liveCheckout.enabled(),store));
 }
 export const server = http.createServer(async (req, res) => {
   const send = (status, type, body) => {
@@ -119,7 +120,7 @@ export const server = http.createServer(async (req, res) => {
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
-    if (path === '/partners' || path === '/partners/') return send(200,'text/html',partnerPage(renderStore()));
+    if (path === '/partners' || path === '/partners/') return send(200,'text/html',launchCopy(partnerPage(renderStore()),liveCheckout.enabled()));
     if (infoPages[path]) return send(200,'text/html',infoPage(renderStore(),infoPages[path]));
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
@@ -134,7 +135,7 @@ export const server = http.createServer(async (req, res) => {
       const product = route[3] ? data?.products.find(p=>p.id===route[3]) : undefined;
       if (route[3] && !product && !error) return send(404,'text/plain','Product not found');
       if(product){try{product.images=await catalog.images(category.slug,product.id);}catch{/* Keep the main photo when supplier media is unavailable. */}}
-      let page=catalogPage(renderStore(store),{store,category,data,error,product});
+      let page=launchCopy(catalogPage(renderStore(store),{store,category,data,error,product}),salesOpen(liveCheckout.enabled(),store));
       if(product) {
         const params=new URL(req.url,'http://localhost').searchParams;
         const options={product,vid:params.get('variant')||'',zip:params.get('zip')||'',quantity:Number(params.get('quantity')||1)};
@@ -148,7 +149,7 @@ export const server = http.createServer(async (req, res) => {
           const available=product.pricedVariants||product.storefrontVariants||(product.pricingPending?[]:options.details.variants.filter(v=>Number.isSafeInteger(v.stock)&&v.stock>0&&Number.isSafeInteger(v.price)));
           const chosen=available.find(v=>v.id===options.vid)||available[0];
           if(chosen)
-          page=page.replace('<strong>Not available to purchase yet</strong>',`<p><a href="/checkout/products?variant=${encodeURIComponent(chosen.id)}&amp;product=${encodeURIComponent(product.id)}&amp;category=${encodeURIComponent(category.slug)}&amp;zip=${encodeURIComponent(options.zip)}">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>`);
+          page=page.replace('<strong>Not available to purchase yet</strong>',purchaseLink({open:salesOpen(liveCheckout.enabled(),store),variant:chosen.id,product:product.id,category:category.slug,zip:options.zip}));
         }
       }
       return send(error?503:200,'text/html',page);

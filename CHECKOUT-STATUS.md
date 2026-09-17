@@ -14,13 +14,13 @@ Updated 2026-09-17. Live purchases remain CLOSED. This document replaces earlier
 
 ## Latest verification
 
-98 automated tests passed. Added an integrated test covering signed payment -> owner queue -> single unpaid CJ draft -> simulated manual supplier payment -> CJ shipment sync -> private customer tracking -> refund fulfillment hold. Repeated Stripe notifications and submit calls do not duplicate the order. Supplier and payment responses in this automated run were fixtures. No external order was created and no funds moved.
+101 automated tests passed. Added an integrated test covering signed payment -> owner queue -> single unpaid CJ draft -> simulated manual supplier payment -> CJ shipment sync -> private customer tracking -> refund fulfillment hold. Repeated Stripe notifications and submit calls do not duplicate the order. Supplier and payment responses in this automated run were fixtures. No external order was created and no funds moved.
 
 The public /checkout/live page was checked and still reports that checkout is not open.
 
 ## Remaining before opening sales
 
-1. Prepare storefront purchase links and customer copy to follow the live checkout gate; current public product links still point to sandbox. Update partner dashboard to show live commissions separately from test activity, without making demo referrals payable.
+1. Storefront links and launch copy now follow the live checkout readiness gate; both LIVE_CHECKOUT and CJ_PRODUCTION_FULFILLMENT must be enabled, alongside valid live intake/Stripe configuration. Demo storefronts stay in sandbox. Partner dashboards show live commissions and recorded manual payouts separately from optional test activity. These presentation changes do not enable checkout or payouts.
 2. Verify current supplier stock/freight availability and the production CJ create/detail response contract, manual payment workflow, and shipment identity matching. Automated fixtures and the earlier CJ sandbox order do not prove real supplier fulfillment.
 3. Coordinate production fulfillment enablement with checkout activation and operator readiness. Do not open checkout merely because tests pass. The owner must monitor paid orders, submit reviewed drafts, pay CJ manually, and sync status.
 
