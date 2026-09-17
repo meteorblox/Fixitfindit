@@ -1,3 +1,4 @@
+import {isReplacementPart} from './catalog-policy.mjs';
 import {contribution,includedShipping} from './pricing-policy.mjs';
 
 export const markupPercent=150;
@@ -21,7 +22,7 @@ export function automaticRetail(supplierCents,freightCents) {
 export function deliveredPrice({product,details,vid,zip,shipping,quantity=1}) {
   if(quantity!==1 || product?.checkoutHold || !/^\d{5}$/.test(zip||'')) return null;
   const actual=details?.variants.find(v=>v.id===vid);
-  if(!actual || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) return null;
+  if(!actual || isReplacementPart(actual.name) || isReplacementPart(product?.name) || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) return null;
   const approved=product?.pricedVariants?.find(v=>v.id===vid);
   // Manual products retain their exact approved options, including multipack exclusions.
   if(product?.pricedVariants && !approved) return null;

@@ -1,3 +1,4 @@
+import {isReplacementPart} from './catalog-policy.mjs';
 import {deliveredPrice} from './automatic-pricing.mjs';
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const usd=c=>'$'+(c/100).toFixed(2);
@@ -5,7 +6,7 @@ export function productOptions({product,details,detailError,shipping,shippingErr
   if(product?.checkoutHold) return '<p>This product is not currently available.</p>';
   if(detailError) return `<p role="status">${esc(detailError)}</p>`;
   if(!details) return '';
-  const variants=(product?.pricedVariants || details.variants).map(v=>({...v,actual:details.variants.find(a=>a.id===v.id)})).filter(v=>Number.isSafeInteger(v.actual?.stock) && v.actual.stock>0 && Number.isSafeInteger(v.actual.price) && v.actual.price>=0);
+  const variants=(product?.pricedVariants || details.variants).map(v=>({...v,actual:details.variants.find(a=>a.id===v.id)})).filter(v=>!isReplacementPart(v.name) && !isReplacementPart(v.actual?.name) && Number.isSafeInteger(v.actual?.stock) && v.actual.stock>0 && Number.isSafeInteger(v.actual.price) && v.actual.price>=0);
   if(!variants.length) return '<p>No options are currently available. Please check back.</p>';
   const selected=variants.find(v=>v.id===vid)||variants[0];
   let delivery='';

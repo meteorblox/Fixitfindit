@@ -1,3 +1,4 @@
+import {isReplacementPart} from './catalog-policy.mjs';
 import {selectedProducts} from './selected-products.mjs';
 import {normalizeShipping} from './shipping-quotes.mjs';
 export const categories = [
@@ -49,7 +50,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
         const params = new URLSearchParams({page:'1',size:'24',keyWord:category.query,countryCode:'US',orderBy:'1',sort:'desc'});
         const result = await call('/product/listV2?' + params, {headers:{'CJ-Access-Token':access}});
         if (!Array.isArray(result?.content)) throw new Error('CJ returned an unexpected catalog format.');
-        const products = result.content.flatMap(group => group.productList || []).filter(p => p.id && p.nameEn).map(p => ({
+        const products = result.content.flatMap(group => group.productList || []).filter(p => p.id && p.nameEn && !isReplacementPart(p.nameEn)).map(p => ({
           id:String(p.id),name:String(p.nameEn),image:safeImage(p.bigImage),
           supplierPrice:String(p.sellPrice ?? ''),listings:Number(p.listedNum) || 0,
           hasVideo:p.isVideo === 1,category:slug
@@ -102,7 +103,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       if(!Array.isArray(data?.variants)) throw new Error('Invalid product details');
       const inventory=await call('/product/stock/getInventoryByPid?'+new URLSearchParams({pid:id}),{headers:{'CJ-Access-Token':access}});
       if(!Array.isArray(inventory?.variantInventories)) throw new Error('Variant inventory is unavailable');
-      return {origin:product.origin||'US',variants:data.variants.filter(v=>v.vid).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:usStock(inventory.variantInventories,v.vid,product.origin||'US')}))};
+      return {origin:product.origin||'US',variants:data.variants.filter(v=>v.vid && !isReplacementPart(v.variantKey) && !isReplacementPart(v.variantNameEn)).map(v=>({id:String(v.vid),name:String(v.variantKey || v.variantNameEn || v.variantSku || 'Standard'),price:money(v.variantSellPrice),stock:usStock(inventory.variantInventories,v.vid,product.origin||'US')}))};
     });
   }
   async function shipping(slug,id,vid,zip,quantity=1) {

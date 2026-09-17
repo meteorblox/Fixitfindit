@@ -1,3 +1,4 @@
+import {isReplacementPart} from './catalog-policy.mjs';
 import {automaticRetail,eligibleMethod} from './automatic-pricing.mjs';
 import {categories} from './catalog.mjs';
 import {randomUUID} from 'node:crypto';
@@ -20,10 +21,10 @@ export async function checkoutItem(catalog, variantId, context={}) {
       if(approved.category!==context.category || !approved.pricedVariants?.some(v=>v.id===variantId)) throw new Error('Unapproved option');
     } else {
       const product=(await catalog.list(context.category)).products.find(p=>p.id===context.productId);
-      if(!product || product.checkoutHold || product.pricedVariants) throw new Error('Unknown or restricted product');
+      if(!product || isReplacementPart(product.name) || product.checkoutHold || product.pricedVariants) throw new Error('Unknown or restricted product');
       const details=await catalog.detail(context.category,context.productId);
       const actual=details.variants.find(v=>v.id===variantId);
-      if(!actual || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('Stock or cost unavailable');
+      if(!actual || isReplacementPart(actual.name) || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('Stock or cost unavailable');
       return {productId:product.id,variantId,name:product.name+' · '+actual.name,category:context.category,origin:details.origin,supplierCents:actual.price,retailCents:null,automatic:true};
     }
   }
@@ -32,7 +33,7 @@ export async function checkoutItem(catalog, variantId, context={}) {
   if(!variant || !product.lookup.pid || product.checkoutHold) throw new Error('This option does not have approved checkout pricing.');
   const details=await catalog.detail(product.category,product.lookup.pid);
   const actual=details.variants.find(v=>v.id===variantId);
-  if(!actual || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('This option does not currently have confirmed stock.');
+  if(!actual || isReplacementPart(actual.name) || !Number.isSafeInteger(actual.stock) || actual.stock<1 || !Number.isSafeInteger(actual.price) || actual.price<0) throw new Error('This option does not currently have confirmed stock.');
   return {productId:product.lookup.pid,variantId,name:product.name+' · '+variant.name,retailCents:variant.retailCents,supplierCents:actual.price,category:product.category,origin:details.origin||product.origin};
 }
 
