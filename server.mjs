@@ -68,7 +68,7 @@ for (const store of stores) {
 const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
 const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH,{affiliates:liveOrders?.affiliates}):null;
-const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts});
+const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts,branding:partnerStore});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ['/favicon.svg','image/svg+xml'],
@@ -91,10 +91,11 @@ export function renderStore(store) {
   html = html.replace('<!-- store-information-menu -->',infoMenu);
   if (!store) return launchCopy(html,liveCheckout.enabled());
   const name = escape(store.name);
+  const logo=typeof store.logoUrl==='string'&&/^\/partner-logos\/[a-z0-9-]+\?v=[a-f0-9]{16}$/.test(store.logoUrl)?'<img src="'+escape(store.logoUrl)+'" alt="" style="width:auto;height:56px;max-width:180px;object-fit:contain">':'<span class="partner-mark" aria-hidden="true">'+escape(store.name[0])+'</span>';
   html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
     .replace('</head>', `<meta name="robots" content="noindex,nofollow"><style>:root{--orange:${store.accent}}</style></head>`)
     .replace(/<div class="notice">.*?<\/div>/, '<div class="notice">Partner storefront preview · Purchases and commissions are not enabled</div>')
-    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home"><span class="partner-mark" aria-hidden="true">${escape(store.name[0])}</span><span>${name}</span></a>`)
+    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home">${logo}<span>${name}</span></a>`)
     .replace('<h1>Small fixes.<br><em>Better home.</em></h1>', `<p class="eyebrow">${name}</p><h1>Small fixes.<br><em>Better home.</em></h1><p>${escape(store.tagline)}</p>`)
     .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b> · A FixItFindIt storefront preview`);
   html = html.replace('<footer>', '<footer><p class="partner-powered shell">Powered by <a href="/">FixItFindIt</a></p>');
@@ -130,6 +131,8 @@ export const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname;
     if (path === '/partners' || path === '/partners/') return send(200,'text/html',partnerPage(renderStore(),liveCheckout.enabled()));
     if (infoPages[path]) return send(200,'text/html',infoPage(renderStore(),infoPages[path]));
+    const logoPath=path.match(/^\/partner-logos\/([a-z0-9-]+)$/);
+    if(logoPath){const logo=partnerStore?.logo(logoPath[1]);if(!logo)return send(404,'text/plain','Logo not found');res.setHeader('Cache-Control','public, max-age=0, must-revalidate');res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return send(200,logo.mime,Buffer.from(logo.bytes));}
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
     if (path === '/' || path === '/index.html') return send(200, 'text/html', await renderHome());

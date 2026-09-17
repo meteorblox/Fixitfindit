@@ -42,3 +42,9 @@ If a prepared payment was definitely never sent, cancel-unsent PAYOUT_ID release
 Applications are open at /partners with manual approval. Approved records are genuine partners rather than demo stores; live checkout still controls whether sales can begin. The home-helper demo remains a demo and is excluded from live referral resolution. The application page explicitly distinguishes open enrollment from closed customer checkout. Terms shown remain 5%, monthly manual PayPal, 30-day hold, $25 minimum, refund adjustments and no guaranteed earnings.
 
 Current partner branding is a storefront name and initial-based mark, plus configured accent color and tagline. Uploaded custom logos and self-service brand editing are not implemented. The main site's favicon is a small vector version of its orange pin/navy wrench mark, served from /favicon.svg and linked from the storefront and owner/partner dashboards.
+
+## Self-service logos — 2026-09-17
+
+Approved partners can now upload, replace and remove their storefront logo under Partner dashboard > Storefront logo. Accepts PNG, JPEG and WebP up to 512 KB, stored persistently in SQLite. SVG and other formats are rejected. Access is scoped to the signed-in partner and POST requests require the site's Origin. Logos are served as fixed raster content types with nosniff and a restrictive CSP from /partner-logos/SLUG. Uploaded filenames and external URLs are never used. A versioned URL refreshes replacements; removing a logo restores the initial-based mark. Storefront header and footer show the logo alongside the storefront name. Demo stores cannot upload.
+
+This supersedes the earlier note that custom logo uploads were unavailable. The main FixItFindIt logo and affiliate commission rules are unchanged.
