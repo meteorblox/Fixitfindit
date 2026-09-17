@@ -103,7 +103,7 @@ export function renderStore(store) {
     .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home">${logo}<span>${name}</span></a>`)
     .replace('<h1>Small fixes.<br><em>Better home.</em></h1>', `<p class="eyebrow">${name}</p><h1>Small fixes.<br><em>Better home.</em></h1><p>${escape(store.tagline)}</p>`)
     .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b>`);
-  html = html.replace('</footer>', '<p class="partner-powered shell">Powered by <a href="https://www.fixitfindit.com/">fixitfindit.com</a></p></footer>');
+  html = html.replace(/<div class="copyright shell">[\s\S]*?<\/div>/, '<div class="copyright partner-powered shell">© 2026 · Powered by <a href="https://www.fixitfindit.com/">fixitfindit.com</a></div>');
   // Demo cards keep their information, but must not imply tracked or payable purchases.
   html = html.replace(/<a href="https:\/\/www\.(?:amazon|walmart)\.com[^>]*>([\s\S]*?)<\/a>/g,
     '<span class="demo-product-link">$1</span>');
