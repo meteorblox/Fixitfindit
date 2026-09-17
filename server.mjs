@@ -93,13 +93,13 @@ export function renderStore(store) {
   if (!store) return launchCopy(html,liveCheckout.enabled());
   const name = escape(store.name);
   const logo=typeof store.logoUrl==='string'&&/^\/partner-logos\/[a-z0-9-]+\?v=[a-f0-9]{16}$/.test(store.logoUrl)?'<img src="'+escape(store.logoUrl)+'" alt="" style="width:auto;height:56px;max-width:180px;object-fit:contain">':'<span class="partner-mark" aria-hidden="true">'+escape(store.name[0])+'</span>';
-  html = html.replace(/<title>.*?<\/title>/, `<title>${name} — Powered by FixItFindIt</title>`)
+  html = html.replace(/<title>.*?<\/title>/, `<title>${name}</title>`)
     .replace('</head>', `<meta name="robots" content="noindex,nofollow"><style>:root{--orange:${store.accent}}</style></head>`)
-    .replace(/<div class="notice">.*?<\/div>/, '<div class="notice">Partner storefront preview · Purchases and commissions are not enabled</div>')
+    .replace(/<div class="notice">.*?<\/div>/, store.demo?'<div class="notice">Demo only · Purchases and commissions are not enabled</div>':'')
     .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home">${logo}<span>${name}</span></a>`)
     .replace('<h1>Small fixes.<br><em>Better home.</em></h1>', `<p class="eyebrow">${name}</p><h1>Small fixes.<br><em>Better home.</em></h1><p>${escape(store.tagline)}</p>`)
-    .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b> · A FixItFindIt storefront preview`);
-  html = html.replace('<footer>', '<footer><p class="partner-powered shell">Powered by <a href="/">FixItFindIt</a></p>');
+    .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b>`);
+  html = html.replace('</footer>', '<p class="partner-powered shell">Powered by <a href="https://www.fixitfindit.com/">fixitfindit.com</a></p></footer>');
   // Demo cards keep their information, but must not imply tracked or payable purchases.
   html = html.replace(/<a href="https:\/\/www\.(?:amazon|walmart)\.com[^>]*>([\s\S]*?)<\/a>/g,
     '<span class="demo-product-link">$1</span>');
