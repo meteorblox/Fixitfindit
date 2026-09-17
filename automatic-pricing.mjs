@@ -1,7 +1,7 @@
 import {contribution,includedShipping} from './pricing-policy.mjs';
 
-export const markupPercent=100;
-export const minimumContributionCents=500;
+export const markupPercent=150;
+export const minimumContributionCents=800;
 // CJ excludes these lines from dispute coverage for certain destinations.
 // Excluding them here is conservative; other carriers are not guaranteed coverage.
 export function eligibleMethod(method) {
@@ -14,7 +14,7 @@ export function automaticRetail(supplierCents,freightCents) {
   const landed=supplierCents+freightCents;
   // Cap supported inputs rather than risking overflow or unbounded calculation.
   if(landed>10000000) throw new Error('Cost exceeds automatic pricing limit');
-  let price=Math.max(100,Math.ceil(landed*2/100)*100);
+  let price=Math.max(100,Math.ceil(landed*(1+markupPercent/100)/100)*100);
   while(contribution(price,supplierCents,freightCents)<minimumContributionCents) price+=100;
   return price;
 }
