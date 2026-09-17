@@ -1,5 +1,5 @@
 // Production access is opt-in and never shares the sandbox adapter's mutations.
-export function createProductionCj({apiKey=process.env.CJ_API_KEY,enabled=false,request=fetch,interval=1100}={}) {
+export function createProductionCj({apiKey=process.env.CJ_API_KEY,enabled=false,paymentMode="manual",request=fetch,interval=1100}={}) {
  let token,expires=0,queue=Promise.resolve(),next=0;
  async function call(path,body,method=body?'POST':'GET') {
   if(!enabled||!apiKey)throw new Error('Production CJ access is disabled');
@@ -16,6 +16,6 @@ export function createProductionCj({apiKey=process.env.CJ_API_KEY,enabled=false,
    const body=Object.fromEntries(fields.map(k=>[k,payload[k]]));await auth();const data=await call('/shopping/order/createOrderV2',{...body,isSandbox:0,payType:3,orderFlow:1,shopLogisticsType:2});if(!data?.orderId||typeof data.orderId!=='string')throw new Error('Creation result unknown');return data.orderId;
   },
   async confirm(id){await auth();return call('/shopping/order/confirmOrder',{orderId:id},'PATCH');},
-  async pay(id){await auth();return call('/shopping/pay/payBalanceV2',{shipmentOrderId:id});}
+  async pay(id){if(paymentMode!=="wallet")throw new Error("Manual CJ payment required");await auth();return call('/shopping/pay/payBalanceV2',{shipmentOrderId:id});}
  };
 }

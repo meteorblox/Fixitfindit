@@ -46,3 +46,8 @@ test('production CJ adapter is disabled by default and always creates unpaid liv
 });
 test('sandbox and live stored payments cannot cross modes',()=>{const f=fixture();try{const sandbox=createOrderStore(':memory:');try{assert.throws(()=>sandbox.recordSession(f.session));assert.throws(()=>f.orders.recordSession({...f.session,livemode:false,id:'cs_test_fixture'}));}finally{sandbox.close()}}finally{f.close()}});
 
+
+test('manual supplier payment mode refuses wallet deductions without contacting CJ',async()=>{
+ let calls=0;const cj=createProductionCj({enabled:true,apiKey:'fixture',request:()=>{calls++;throw Error('No network expected');}});
+ await assert.rejects(cj.pay('shipment'),/Manual CJ payment required/);assert.equal(calls,0);
+});
