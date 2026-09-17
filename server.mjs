@@ -42,7 +42,7 @@ const trackingWorker=liveIntake?createProductionFulfillment({path:process.env.OR
 const trackingSync=trackingWorker?createTrackingSync({worker:trackingWorker}):null;
 trackingSync?.start();
 const ownerEmail=liveIntake?createOwnerEmailLogin({path:process.env.ORDERS_DB_PATH}):null;
-const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker,tracking:trackingSync,emailLogin:ownerEmail});
+
 const liveReady=process.env.CJ_PRODUCTION_FULFILLMENT==='enabled' && liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
 const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
@@ -68,6 +68,7 @@ for (const store of stores) {
 const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const dashboardAccess=process.env.ORDERS_DB_PATH?createDashboardAccess(process.env.ORDERS_DB_PATH):null;
 const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.ORDERS_DB_PATH,{affiliates:liveOrders?.affiliates}):null;
+const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker,tracking:trackingSync,emailLogin:ownerEmail,partners:partnerStore,payouts:manualPayouts});
 const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts,branding:partnerStore});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([

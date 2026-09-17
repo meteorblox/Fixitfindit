@@ -48,3 +48,7 @@ Current partner branding is a storefront name and initial-based mark, plus confi
 Approved partners can now upload, replace and remove their storefront logo under Partner dashboard > Storefront logo. Accepts PNG, JPEG and WebP up to 512 KB, stored persistently in SQLite. SVG and other formats are rejected. Access is scoped to the signed-in partner and POST requests require the site's Origin. Logos are served as fixed raster content types with nosniff and a restrictive CSP from /partner-logos/SLUG. Uploaded filenames and external URLs are never used. A versioned URL refreshes replacements; removing a logo restores the initial-based mark. Storefront header and footer show the logo alongside the storefront name. Demo stores cannot upload.
 
 This supersedes the earlier note that custom logo uploads were unavailable. The main FixItFindIt logo and affiliate commission rules are unchanged.
+
+## Owner affiliate management — 2026-09-17
+
+The owner dashboard now links Orders and Affiliates under the same owner login. /owner/orders/affiliates privately lists applications and live earnings, recorded manual payouts, refund holds and saved PayPal destinations. Pending applications can be approved with a unique storefront slug using an owner-authenticated CSRF-protected form. Approval does not email access credentials, send money or change payout policy. Partner dashboard access codes and payout execution remain the existing operator/manual workflows. No real applications were approved during verification.
