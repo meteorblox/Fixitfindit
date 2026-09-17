@@ -14,7 +14,7 @@ Updated 2026-09-17. Live purchases remain CLOSED. This document replaces earlier
 
 ## Latest verification
 
-101 automated tests passed. Added an integrated test covering signed payment -> owner queue -> single unpaid CJ draft -> simulated manual supplier payment -> CJ shipment sync -> private customer tracking -> refund fulfillment hold. Repeated Stripe notifications and submit calls do not duplicate the order. Supplier and payment responses in this automated run were fixtures. No external order was created and no funds moved.
+103 automated tests passed. Added an integrated test covering signed payment -> owner queue -> single unpaid CJ draft -> simulated manual supplier payment -> CJ shipment sync -> private customer tracking -> refund fulfillment hold. Repeated Stripe notifications and submit calls do not duplicate the order. Supplier and payment responses in this automated run were fixtures. No external order was created and no funds moved.
 
 The public /checkout/live page was checked and still reports that checkout is not open.
 
@@ -31,3 +31,7 @@ Persistent database: ORDERS_DB_PATH on /data, one replica. LIVE_ORDER_INTAKE is 
 Partner policy: 5% of eligible product subtotal, excluding tax and separately charged shipping; monthly manual PayPal payouts after a 30-day hold, $25 minimum, refund adjustments and review. Live partner presentation and payout activation remain separate launch work.
 
 See MANUAL-CJ-OPERATIONS.md for owner access, submission, payment and sync instructions. Customer support: fixitfindits@gmail.com.
+
+## CJ response compatibility update
+
+Actual read-only queries confirmed the corrected default store and an unpaid manual production draft. Missing ZIP/address2 response fields now require a recorded manual address comparison. Returned mismatches still block progress. See MANUAL-CJ-OPERATIONS.md. This does not verify API production creation end to end: the inspected production draft was created by the owner in CJ. Checkout and production fulfillment flags remain disabled.

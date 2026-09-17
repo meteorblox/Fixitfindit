@@ -71,3 +71,12 @@ test('manual launch flow joins signed payment, owner queue, CJ sync, private tra
   assert.equal(f.worker.list()[0].fulfillmentHold,true);assert.equal(read().review,true);assert.equal(read().status,'Shipped');await assert.rejects(f.worker.submit(f.o.id),/Refund/);
  }finally{tracking.close();f.close();}
 });
+
+test('omitted CJ address fields require exact-order manual review without duplicate submission or payment',async()=>{
+ const f=fixture();try{f.paid();await f.worker.submit(f.o.id);delete f.getDetail().shippingZip;delete f.getDetail().shippingAddress2;const first=await f.worker.sync(f.o.id);assert.equal(first.addressReviewRequired,true);assert.equal(first.lastError,'manual_address_review_required');await f.worker.submit(f.o.id);assert.equal(f.counts().creates,1);await assert.rejects(f.worker.pay(f.o.id,1000),/Manual address/);assert.equal(f.counts().pays,0);assert.equal(f.getDetail().orderStatus,'CREATED');assert.equal(f.worker.address(f.o.id).zip,'60601');await assert.rejects(f.worker.verifyAddress(f.o.id,'wrong'),/Exact CJ/);await f.worker.verifyAddress(f.o.id,'child');assert.equal((await f.worker.sync(f.o.id)).addressReviewRequired,false);assert.ok(f.worker.summary(f.o.id).addressReviewedAt);assert.equal(f.counts().pays,0);
+ // An explicitly different value cannot be waived by the manual review command.
+ f.getDetail().shippingZip='99999';await assert.rejects(f.worker.verifyAddress(f.o.id,'child'));assert.equal(f.worker.summary(f.o.id).addressReviewRequired,true);delete f.getDetail().shippingZip;assert.equal((await f.worker.sync(f.o.id)).addressReviewRequired,true);
+ f.orders.refunds.hold(f.o.id);await assert.rejects(f.worker.verifyAddress(f.o.id,'child'),/Refund/);
+ }finally{f.close();}
+});
+test('manual address review never overrides returned recipient mismatches or unknown supplier states',async()=>{const f=fixture();try{f.paid();await f.worker.submit(f.o.id);delete f.getDetail().shippingZip;f.getDetail().shippingAddress+=' duplicated';await assert.rejects(f.worker.verifyAddress(f.o.id,'child'));assert.equal(f.worker.summary(f.o.id).addressReviewedAt,null);assert.equal(f.counts().pays,0);f.getDetail().shippingAddress='123 Test Street';f.getDetail().orderStatus='UNKNOWN';await assert.rejects(f.worker.verifyAddress(f.o.id,'child'));}finally{f.close();}});

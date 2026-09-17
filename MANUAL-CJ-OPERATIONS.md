@@ -19,3 +19,17 @@ In the Railway service console run `node owner-access-cli.mjs issue`, then enter
 ## Customer tracking
 
 The live payment return page issues an order-bound signed tracking link only after customer ownership and a signed payment webhook are verified. Links work beyond the checkout cookie lifetime; anyone holding a link can see limited product/shipment status, so customers should keep it private. No address, email, supplier cost, or CJ order identifier is exposed. Tracking uses saved CJ state and updates after the operator runs sync; no carrier polling or email delivery is added. The signing key is stored in the persistent order database. Customer tracking remains readable if new checkout is disabled.
+
+## Missing CJ address fields
+
+Read-only checks of the actual CJ sandbox order and the owner-created unpaid production draft on 2026-09-17 confirmed that getOrderDetail omits shippingZip and shippingAddress2. Missing fields now set an explicit address-review flag without treating the draft as a failed creation. All returned recipient, order, variant, method and origin fields still must match; a mismatch blocks reconciliation and invalidates prior manual review.
+
+Before paying a flagged order in MyCJ:
+1. Run `node production-fulfillment-cli.mjs address ORDER_ID` in the private Railway console. This displays the expected recipient and full address; do not share its output.
+2. Open the exact CJ order ID, compare the recipient, street, apartment/unit, city, state, ZIP and country. Correct CJ fields if needed.
+3. Run `node production-fulfillment-cli.mjs verify-address ORDER_ID CJ_ORDER_ID` only after comparison. This records an operator attestation bound to that order and the current returned address. It performs read-only CJ queries, never edits the address or pays. A returned mismatch or refund hold cannot be overridden.
+4. Check the final supplier amount and refund status again before manual payment. Sync afterward as usual.
+
+CJ does not return all address fields, so changes to omitted fields cannot be detected automatically. The owner must review them in CJ immediately before each manual payment. Wallet payment remains disabled by default.
+
+The separate manual draft FIT-CJ-CHECK-001 is not a paid customer order in FixItFindIt and is not inserted into the live order ledger by these checks. Its API status was CREATED, isSandbox=0, one approved silver variant, product $4.59 plus $6.57 postage. The owner subsequently reported correcting a duplicated street address and missing ZIP; that correction has not been independently verified.
