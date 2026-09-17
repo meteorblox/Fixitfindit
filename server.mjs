@@ -1,3 +1,4 @@
+import {createCustomerTracking,createTrackingRoute} from './customer-tracking.mjs';
 import {createOwnerAccess,createOwnerOrdersRoute} from './owner-orders.mjs';
 import {createManualPayouts} from './manual-payouts.mjs';
 import {createDashboardAccess,createDashboardRoute} from './partner-dashboard.mjs';
@@ -37,7 +38,9 @@ const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,wo
 const liveReady=liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
 const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
-const liveCheckoutRoute=createProductCheckoutRoute({catalog,checkout:liveCheckout,mode:'live',resolvePartner:req=>liveOrders?.affiliates.resolve(referralToken(req),findPartner)});
+const customerTracking=liveOrders?createCustomerTracking({path:process.env.ORDERS_DB_PATH,orders:liveOrders,worker:liveWorker}):null;
+const trackingRoute=createTrackingRoute(customerTracking);
+const liveCheckoutRoute=createProductCheckoutRoute({catalog,checkout:liveCheckout,mode:'live',customerTracking,resolvePartner:req=>liveOrders?.affiliates.resolve(referralToken(req),findPartner)});
 const productionWebhook=createProductionWebhookRoute({orders:liveOrders,worker:liveWorker,secret:process.env.STRIPE_LIVE_WEBHOOK_SECRET,enabled:liveIntake,resolveSession:liveCheckout.retrieve,refundTracking:liveRefundTracking});
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -104,6 +107,7 @@ export const server = http.createServer(async (req, res) => {
   };
   const referralPath=new URL(req.url,'http://localhost').pathname.match(/^\/shop\/([a-z0-9-]+)(?:\/|$)/);
   if(req.method==='GET'&&referralPath&&refundOrders){const partner=findPartner(referralPath[1]);if(partner){try{const token=refundOrders.affiliates.visit(partner);res.setHeader('Set-Cookie','fit_referral='+token+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');}catch{/* Store browsing remains available if referral storage fails. */}}}
+  if (await trackingRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await ownerRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await dashboardRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;

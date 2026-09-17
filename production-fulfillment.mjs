@@ -10,7 +10,7 @@ const norm=v=>String(v??'').trim().replace(/\s+/g,' ').toLowerCase();
 export function createProductionFulfillment({path,orders,catalog,cj,enabled=false}) {
  const db=new DatabaseSync(path);db.exec(`PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS production_jobs(id TEXT PRIMARY KEY,custom_id TEXT UNIQUE NOT NULL,state TEXT NOT NULL,payload TEXT NOT NULL,category TEXT NOT NULL,cj_id TEXT UNIQUE,detail_id TEXT,tracking TEXT,provider TEXT,error TEXT,updated TEXT NOT NULL)`);
  const get=id=>db.prepare('SELECT * FROM production_jobs WHERE id=?').get(id);
- const summary=id=>{const j=get(id);return j?{orderId:id,supplierReference:j.custom_id,cjOrderId:j.detail_id||j.cj_id,state:j.state,trackingNumber:j.tracking,trackingProvider:j.provider,lastError:j.error}:null;};
+ const summary=id=>{const j=get(id);return j?{orderId:id,updatedAt:j.updated,supplierReference:j.custom_id,cjOrderId:j.detail_id||j.cj_id,state:j.state,trackingNumber:j.tracking,trackingProvider:j.provider,lastError:j.error}:null;};
  const update=(id,state,error=null)=>db.prepare('UPDATE production_jobs SET state=?,error=?,updated=? WHERE id=?').run(state,error,new Date().toISOString(),id);
  const claim=(id,from,to)=>db.prepare('UPDATE production_jobs SET state=?,error=NULL,updated=? WHERE id=? AND state=?').run(to,new Date().toISOString(),id,from).changes===1;
  function verified(id){const o=orders.get(id);if(!o||o.status!=='paid_live'||!/^cs_live_/.test(o.session_id||'')||!orders.hasWebhook(id)||o.shipping_address_matches!==1||o.quantity!==1)throw new Error('Verified live payment and matching address required');return o;}
