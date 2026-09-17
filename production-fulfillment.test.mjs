@@ -1,3 +1,4 @@
+import {createCustomerTracking} from './customer-tracking.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
@@ -50,4 +51,23 @@ test('sandbox and live stored payments cannot cross modes',()=>{const f=fixture(
 test('manual supplier payment mode refuses wallet deductions without contacting CJ',async()=>{
  let calls=0;const cj=createProductionCj({enabled:true,apiKey:'fixture',request:()=>{calls++;throw Error('No network expected');}});
  await assert.rejects(cj.pay('shipment'),/Manual CJ payment required/);assert.equal(calls,0);
+});
+
+test('manual launch flow joins signed payment, owner queue, CJ sync, private tracking and refund hold',async()=>{
+ const f=fixture();const tracking=createCustomerTracking({path:':memory:',orders:f.orders,worker:f.worker});
+ try{
+  assert.equal(tracking.link(f.o.id),null);
+  const secret='whsec_flowtest',route=createProductionWebhookRoute({orders:f.orders,worker:f.worker,secret,enabled:true});
+  const raw=JSON.stringify({id:'evt_flowtest',type:'checkout.session.completed',livemode:true,data:{object:{...f.session,payment_intent:'pi_flowtest'}}}),time=Math.floor(Date.now()/1000);
+  const deliver=async()=>{const req=Readable.from([raw]);req.method='POST';req.headers={'stripe-signature':'t='+time+',v1='+createHmac('sha256',secret).update(time+'.'+raw).digest('hex')};const res={writeHead(s){this.status=s;},end(){}};await route(req,res,new URL('https://example.com/webhooks/stripe-live'));assert.equal(res.status,200);};
+  await deliver();await deliver();assert.equal(f.orders.listPaid().length,1);assert.equal(f.worker.list().length,1);assert.deepEqual(f.counts(),{creates:0,pays:0});
+  const url=new URL(tracking.link(f.o.id),'https://example.com');const read=()=>tracking.resolve(url.searchParams.get('order'),url.searchParams.get('key'));
+  assert.equal(read().status,'Preparing your order');await f.worker.submit(f.o.id);await f.worker.submit(f.o.id);assert.deepEqual(f.counts(),{creates:1,pays:0});
+  // Simulate owner payment in MyCJ; application never calls the payment endpoint.
+  f.getDetail().orderStatus='UNSHIPPED';await f.worker.sync(f.o.id);assert.equal(read().status,'Preparing for shipment');
+  f.getDetail().orderStatus='SHIPPED';f.getDetail().trackNumber='MANUALTRACK';f.getDetail().trackingProvider='USPS';await f.worker.sync(f.o.id);
+  assert.equal(read().tracking,'MANUALTRACK');assert.equal(f.worker.list()[0].trackingNumber,'MANUALTRACK');assert.deepEqual(f.counts(),{creates:1,pays:0});
+  const revision=f.orders.refunds.begin(f.o.id);f.orders.refunds.save(f.o.id,revision,[{id:'re_flowtest',payment_intent:'pi_flowtest',currency:'usd',amount:4320,status:'succeeded'}]);
+  assert.equal(f.worker.list()[0].fulfillmentHold,true);assert.equal(read().review,true);assert.equal(read().status,'Shipped');await assert.rejects(f.worker.submit(f.o.id),/Refund/);
+ }finally{tracking.close();f.close();}
 });
