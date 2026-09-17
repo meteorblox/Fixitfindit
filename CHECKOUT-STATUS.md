@@ -71,3 +71,7 @@ Stripe rejected payment_intent_data.shipping with automatic tax during the accou
 Verified on the deployed site with synthetic details and a Stripe test card: faucet $23.50, included shipping $0.00, tax $2.47, total $25.97. The signed webhook was recorded and the sandbox fulfillment job became ready. No CJ purchase or real customer charge occurred. All 69 automated tests passed before the final Stripe configuration correction; targeted address tests passed after correction, followed by the real-account sandbox browser test.
 
 This is not live activation. Stripe live keys remain rejected. CJ freight still uses the ZIP-based quote API; address-format validation is not postal deliverability verification. Live session creation/wiring, production account readiness, customer refunds/policies, and affiliate accounting remain launch work. Do not advertise the store as accepting purchases yet.
+
+## Returns policy — September 16, 2026
+
+Owner chose supplier-backed coverage without a voluntary change-of-mind program. The /returns page now provides support instructions, issue coverage, cancellation and return guidance, while clearly remaining a planned launch policy. Current CJ terms were reviewed; customer remedies and supplier recovery are separate. REFUND-OPERATIONS.md records the private support workflow and remaining refund reconciliation/fulfillment safeguards. No refund API or real payment was invoked. Publishing policy text does not finish the refund implementation.
