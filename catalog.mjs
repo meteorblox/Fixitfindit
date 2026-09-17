@@ -2,7 +2,7 @@ import {isReplacementPart} from './catalog-policy.mjs';
 import {selectedProducts} from './selected-products.mjs';
 import {normalizeShipping} from './shipping-quotes.mjs';
 export const categories = [
-  {slug:'kitchen',name:'Kitchen',query:'kitchen'},
+  {slug:'kitchen',name:'Kitchen',query:'kitchen',extraQueries:['meat cutter','cookware','kitchen storage']},
   {slug:'cleaning',name:'Cleaning',query:'cleaning'},
   {slug:'organization',name:'Organization',query:'organizer'},
   {slug:'tools',name:'Tools',query:'hand tool',extraQueries:['screwdriver','wrench']},
@@ -48,7 +48,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       try {
         const access = await authenticate();
         const products = [], seen = new Set();
-        const expanded=['cleaning','organization','tools','home-improvement'].includes(slug);
+        const expanded=['kitchen','cleaning','organization','tools','home-improvement'].includes(slug);
         for(const keyword of [category.query,...(category.extraQueries||[])]) {
         for(let page=1;page<=(keyword===category.query&&expanded?3:1);page++) {
           const params=new URLSearchParams({page:String(page),size:'24',keyWord:keyword,countryCode:'US',orderBy:'1',sort:'desc',...(expanded?{verifiedWarehouse:'1',startWarehouseInventory:'1'}:{})});

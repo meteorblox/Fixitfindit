@@ -29,9 +29,9 @@ test('partner category links retain storefront and escape product text',()=>{
 });
 
 test('expanded US collections page through results and deduplicate supplier IDs',async()=>{
- for(const slug of ['cleaning','organization','tools','home-improvement']) {
+ for(const slug of ['kitchen','cleaning','organization','tools','home-improvement']) {
  const pages=[];const catalog=createCatalog({apiKey:'fixture',interval:0,request:async(url)=>({ok:true,json:async()=>{if(url.includes('getAccessToken'))return {result:true,data:{accessToken:'fixture'}};const q=new URL(url).searchParams;if(!q.has('verifiedWarehouse'))return {result:true,data:{content:[]}};pages.push(q.get('page'));assert.equal(q.get('verifiedWarehouse'),'1');assert.equal(q.get('countryCode'),'US');return {result:true,data:{totalPages:3,content:[{productList:Array.from({length:24},(_,i)=>({id:i===0?'shared':q.get('page')+'-'+i,nameEn:'Household organizer'}))}]}};}})});
- const data=await catalog.list(slug);assert.deepEqual(pages,['1','2','3',...Array(slug==='tools'?2:slug==='home-improvement'?3:0).fill('1')]);assert.equal(data.products.filter(p=>p.id==='shared'||/^[123]-/.test(p.id)).length,70);
+ const data=await catalog.list(slug);assert.deepEqual(pages,['1','2','3',...Array(slug==='tools'?2:['home-improvement','kitchen'].includes(slug)?3:0).fill('1')]);assert.equal(data.products.filter(p=>p.id==='shared'||/^[123]-/.test(p.id)).length,70);
  }
 });
 
