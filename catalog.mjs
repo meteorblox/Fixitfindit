@@ -109,12 +109,18 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
     })();
     pending.set(key,task); return task;
   }
+  async function productData(slug,id) {
+    const product=selectedProducts.find(p=>p.category===slug && p.lookup.pid===id) || (await list(slug)).products.find(p=>p.id===id);
+    if(!product) throw new Error('Unknown product');
+    return cached('media-data:'+id,5*60000,async()=>{const access=await authenticate();return call('/product/query?'+new URLSearchParams({pid:id,countryCode:product.origin||'US'}),{headers:{'CJ-Access-Token':access}});});
+  }
+  async function images(slug,id) { return productImages(await productData(slug,id)); }
   async function detail(slug,id) {
     const product=selectedProducts.find(p=>p.category===slug && p.lookup.pid===id) || (await list(slug)).products.find(p=>p.id===id);
     if(!product) throw new Error('Unknown product');
     return cached('detail:'+id,5*60000,async()=>{
       const access=await authenticate();
-      const data=await call('/product/query?'+new URLSearchParams({pid:id,countryCode:product.origin||'US'}),{headers:{'CJ-Access-Token':access}});
+      const data=await productData(slug,id);
       if(!Array.isArray(data?.variants)) throw new Error('Invalid product details');
       const inventory=await call('/product/stock/getInventoryByPid?'+new URLSearchParams({pid:id}),{headers:{'CJ-Access-Token':access}});
       if(!Array.isArray(inventory?.variantInventories)) throw new Error('Variant inventory is unavailable');
@@ -135,7 +141,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       return data.map(row=>normalizeShipping(row,{origin:details.origin,destination:'US'})).filter(r=>r.name && r.price!==null).sort((a,b)=>(a.totalCents??a.price)-(b.totalCents??b.price));
     });
   }
-  return {list,detail,shipping};
+  return {list,detail,shipping,images};
 }
 export function money(value) { if(value===null || value===undefined || value==='') return null; const n=Number(value); return Number.isFinite(n)&&n>=0?Math.round(n*100):null; }
 export function usStock(rows,vid,country='US') {
@@ -147,4 +153,10 @@ export function usStock(rows,vid,country='US') {
 }
 export function safeImage(value) {
   try { const url = new URL(value); return url.protocol === 'https:' ? url.href : ''; } catch { return ''; }
+}
+
+export function productImages(data={}) {
+ let extra=data.productImageSet;
+ if(typeof extra==='string'){try{extra=JSON.parse(extra);}catch{extra=[];}}
+ return [...new Set([data.bigImage,data.productImage,...(Array.isArray(extra)?extra:[])].filter(v=>typeof v==='string').map(safeImage).filter(Boolean))].slice(0,30);
 }

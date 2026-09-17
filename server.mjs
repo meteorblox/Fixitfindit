@@ -47,7 +47,7 @@ for (const store of stores) {
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
-  ['/site.css', 'text/css'], ['/brand.css', 'text/css'],
+  ['/product-gallery.js','text/javascript'], ['/site.css', 'text/css'], ['/brand.css', 'text/css'],
   ['/hero-products.png', 'image/png'], ['/fix-it-find-it-logo.png', 'image/png']
 ]);
 
@@ -110,6 +110,7 @@ export const server = http.createServer(async (req, res) => {
       try { data = await catalog.list(category.slug); } catch(e) { error = e.message; }
       const product = route[3] ? data?.products.find(p=>p.id===route[3]) : undefined;
       if (route[3] && !product && !error) return send(404,'text/plain','Product not found');
+      if(product){try{product.images=await catalog.images(category.slug,product.id);}catch{/* Keep the main photo when supplier media is unavailable. */}}
       let page=catalogPage(renderStore(store),{store,category,data,error,product});
       if(product) {
         const params=new URL(req.url,'http://localhost').searchParams;
