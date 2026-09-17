@@ -18,11 +18,11 @@ test('fixed-address Stripe checkout uses saved shipping for tax and payment, has
  const checkout=createCheckout({key:'sk_test_fixture',orders,request:async(url,o)=>{requests.push({url,body:o.body&&new URLSearchParams(o.body)});if(url.endsWith('/customers'))return {ok:true,json:async()=>({id:'cus_fixture',livemode:false})};if(o.body){const b=new URLSearchParams(o.body);session={id:'cs_test_fixed',livemode:false,url:'https://checkout.stripe.com/test',client_reference_id:'owner',currency:'usd',status:'open',payment_status:'unpaid',amount_subtotal:2350,automatic_tax:{enabled:true,status:'requires_location_inputs'},metadata:Object.fromEntries([...b].filter(([k])=>k.startsWith('metadata[')).map(([k,v])=>[k.slice(9,-1),v]))};}return {ok:true,json:async()=>session};}});
  try{const item={productId:'1696373349800226816',variantId:'1696373349854752768',name:'Faucet',retailCents:2350,quoteId:'quote',shipping:{name:'USPS',zip:'60601',cents:0,recipient}};
  await checkout.startProduct('https://www.fixitfindit.com','owner',item);const b=requests[1].body;
- assert.equal(b.get('customer'),'cus_fixture');assert.equal(b.get('payment_intent_data[shipping][address][line1]'),'123 Test Street');assert.equal(b.has('shipping_address_collection[allowed_countries][0]'),false);assert.ok(Number(b.get('expires_at'))<=Date.now()/1000+1861);
+ assert.equal(b.get('customer'),'cus_fixture');assert.equal(requests[0].body.get('shipping[address][line1]'),'123 Test Street');assert.equal(b.has('payment_intent_data[shipping][address][line1]'),false);assert.equal(b.has('shipping_address_collection[allowed_countries][0]'),false);assert.ok(Number(b.get('expires_at'))<=Date.now()/1000+1861);
  await checkout.startProduct('https://www.fixitfindit.com','owner',item);assert.equal(requests.filter(r=>r.body&&r.url.endsWith('/checkout/sessions')).length,1);
- session={...session,status:'complete',payment_status:'paid',amount_total:2538,automatic_tax:{enabled:true,status:'complete'},total_details:{amount_tax:188,amount_shipping:0,amount_discount:0},payment_intent:{livemode:false,shipping:recipient}};
+ session={...session,status:'complete',payment_status:'paid',amount_total:2538,automatic_tax:{enabled:true,status:'complete'},total_details:{amount_tax:188,amount_shipping:0,amount_discount:0},customer:{livemode:false,shipping:recipient}};
  assert.equal((await checkout.verifyProduct(session.id,'owner')).destinationMatches,true);
- session.payment_intent.shipping={...recipient,address:{...recipient.address,line1:'Wrong street'}};
+ session.customer.shipping={...recipient,address:{...recipient.address,line1:'Wrong street'}};
  assert.equal((await checkout.verifyProduct(session.id,'owner')).destinationMatches,false);
  assert.equal(orders.get(session.metadata.order_id).shipping_address_matches,0);
  }finally{orders.close();}

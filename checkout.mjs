@@ -19,10 +19,10 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
   }
   async function retrieve(id) {
     if(!/^cs_test_[a-zA-Z0-9]+$/.test(id||''))throw new Error('Invalid session');
-    const s=await call('/'+id+'?expand[]=payment_intent');
+    const s=await call('/'+id+'?expand[]=customer');
     if(s.metadata?.address_mode==='fixed'&&s.status==='complete') {
-      if(s.payment_intent?.livemode!==false||!s.payment_intent.shipping)throw new Error('Verified delivery address unavailable');
-      s.collected_information={...s.collected_information,shipping_details:s.payment_intent.shipping};
+      if(s.customer?.livemode!==false||!s.customer.shipping)throw new Error('Verified delivery address unavailable');
+      s.collected_information={...s.collected_information,shipping_details:s.customer.shipping};
     }
     return s;
   }
@@ -42,7 +42,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
       const session = await call('', {
         mode:'payment','payment_method_types[0]':'card',
         expires_at:String(deadline),
-        ...(recipient?{customer:customer.id,'metadata[address_mode]':'fixed',...shippingFields('payment_intent_data[shipping]',recipient)}:{'shipping_address_collection[allowed_countries][0]':'US'}),
+        ...(recipient?{customer:customer.id,'metadata[address_mode]':'fixed'}:{'shipping_address_collection[allowed_countries][0]':'US'}),
         'line_items[0][price_data][currency]':'usd',
         'line_items[0][price_data][unit_amount]':String(item.retailCents),
         'line_items[0][price_data][tax_behavior]':'exclusive',
