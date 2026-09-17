@@ -107,9 +107,11 @@ export const server = http.createServer(async (req, res) => {
           catch(e) { options.shippingError=e.message; }
         }
         page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
-        if(!store && product.pricedVariants?.length) {
-          const chosen=product.pricedVariants.find(v=>v.id===options.vid)||product.pricedVariants[0];
-          page=page.replace('<strong>Not available to purchase yet</strong>',`<p><a href="/checkout/products?variant=${encodeURIComponent(chosen.id)}">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>`);
+        if(!store && !product.checkoutHold && options.details) {
+          const available=product.pricedVariants||options.details.variants.filter(v=>Number.isSafeInteger(v.stock)&&v.stock>0&&Number.isSafeInteger(v.price));
+          const chosen=available.find(v=>v.id===options.vid)||available[0];
+          if(chosen)
+          page=page.replace('<strong>Not available to purchase yet</strong>',`<p><a href="/checkout/products?variant=${encodeURIComponent(chosen.id)}&amp;product=${encodeURIComponent(product.id)}&amp;category=${encodeURIComponent(category.slug)}&amp;zip=${encodeURIComponent(options.zip)}">Try this product in sandbox checkout →</a></p><strong>Live purchases are not enabled yet</strong>`);
         }
       }
       return send(error?503:200,'text/html',page);
