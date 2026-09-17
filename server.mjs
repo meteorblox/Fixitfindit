@@ -100,7 +100,7 @@ export function renderStore(store) {
   html = html.replace(/<title>.*?<\/title>/, `<title>${name}</title>`)
     .replace('</head>', `<meta name="robots" content="noindex,nofollow"><style>:root{--orange:${store.accent}}</style></head>`)
     .replace(/<div class="notice">.*?<\/div>/, store.demo?'<div class="notice">Demo only · Purchases and commissions are not enabled</div>':'')
-    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home">${logo}<span>${name}</span></a>`)
+    .replace(/<a class="brand brand-image[^>]*>.*?<\/a>/g, `<a class="brand partner-brand" href="/shop/${store.slug}" aria-label="${name} home">${logo}${store.showName===false&&store.logoUrl?'':'<span>'+name+'</span>'}</a>`)
     .replace('<h1>Small fixes.<br><em>Better home.</em></h1>', `<p class="eyebrow">${name}</p><h1>Small fixes.<br><em>Better home.</em></h1><p>${escape(store.tagline)}</p>`)
     .replace('<b>Amazing Solutions</b> FixItFindIt.com', `<b>${name}</b>`);
   html = html.replace(/<div class="copyright shell">[\s\S]*?<\/div>/, '<div class="copyright partner-powered shell">© 2026 · Powered by <a href="https://www.fixitfindit.com/">fixitfindit.com</a></div>');

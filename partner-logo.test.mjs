@@ -18,3 +18,21 @@ test('logo route requires authentication and same origin and uses session partne
  async function run({token='valid',origin='https://www.fixitfindit.com',remove=false}={}){const f=new FormData();f.append('logo',new Blob([png]),'logo.png');f.append('partner','someone-else');const r=new Request('https://example.com',{method:'POST',body:f}),req=Readable.from([Buffer.from(await r.arrayBuffer())]);req.method='POST';req.headers={origin,cookie:'fit_partner_session='+token,'content-type':r.headers.get('content-type')};const res={writeHead(n,h){this.status=n;this.headers=h;},end(){}};await route(req,res,new URL('https://www.fixitfindit.com/partners/dashboard/logo'+(remove?'/remove':'')));return res;}
  assert.equal((await run({token:'bad'})).status,403);assert.equal((await run({origin:'https://evil.example'})).status,403);assert.deepEqual(saved,[]);assert.equal((await run()).status,303);assert.deepEqual(saved,['own']);await run({remove:true});assert.deepEqual(saved,['own','remove:own']);assert.match(dashboardPage(partner,[],'',null,{brandingAllowed:true}),/Save logo/);
 });
+test('name preferences remain partner scoped and preserve storefront links',()=>{
+ const store=createPartnerStore(':memory:');try{
+ store.apply({name:'A',brand:'Alpha',email:'a@example.com'});store.apply({name:'B',brand:'Beta',email:'b@example.com'});
+ const a=store.list().find(x=>x.email==='a@example.com'),b=store.list().find(x=>x.email==='b@example.com');
+ assert.throws(()=>store.saveBranding(a.id,'New',false));store.approve(a.id,'alpha');store.approve(b.id,'beta');
+ store.saveBranding(a.id,'New name',false);assert.equal(store.find('alpha').name,'New name');assert.equal(store.find('alpha').showName,false);assert.equal(store.find('beta').name,'Beta');assert.equal(store.find('beta').showName,true);
+ assert.throws(()=>store.saveBranding(a.id,'',true));store.saveBranding(a.id,'Restored',true);assert.equal(store.find('alpha').showName,true);
+ }finally{store.close();}
+});
+test('name route rejects unauthenticated and cross-origin writes and ignores submitted partner ID',async()=>{
+ const saved=[],p={id:'own',slug:'own',name:'Own',demo:false};
+ const route=createDashboardRoute({access:{resolve:t=>t==='valid'?p:null},findPartner:()=>p,affiliates:{list:()=>[]},branding:{saveBranding:(...v)=>saved.push(v)}});
+ async function run(token='valid',origin='https://www.fixitfindit.com'){
+ const req=Readable.from(['name=New&partner=other']);req.method='POST';req.headers={origin,cookie:'fit_partner_session='+token,'content-type':'application/x-www-form-urlencoded'};
+ const res={writeHead(n){this.status=n;},end(){}};await route(req,res,new URL('https://www.fixitfindit.com/partners/dashboard/branding'));return res.status;
+ }
+ assert.equal(await run('bad'),403);assert.equal(await run('valid','https://evil.example'),403);assert.equal(saved.length,0);assert.equal(await run(),303);assert.deepEqual(saved,[['own','New',false]]);
+});
