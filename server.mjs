@@ -48,7 +48,7 @@ const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
 const customerTracking=liveOrders?createCustomerTracking({path:process.env.ORDERS_DB_PATH,orders:liveOrders,worker:liveWorker}):null;
 const trackingRoute=createTrackingRoute(customerTracking);
-const liveCheckoutRoute=createProductCheckoutRoute({catalog,checkout:liveCheckout,mode:'live',customerTracking,resolvePartner:req=>liveOrders?.affiliates.resolve(referralToken(req),findPartner)});
+const liveCheckoutRoute=createProductCheckoutRoute({catalog,checkout:liveCheckout,mode:'live',customerTracking,resolvePartner:req=>liveOrders?.affiliates.resolve(referralToken(req),slug=>{const p=findPartner(slug);return p&&!p.demo?p:null;})});
 const productionWebhook=createProductionWebhookRoute({orders:liveOrders,worker:liveWorker,secret:process.env.STRIPE_LIVE_WEBHOOK_SECRET,enabled:liveIntake,resolveSession:liveCheckout.retrieve,refundTracking:liveRefundTracking});
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -71,6 +71,7 @@ const manualPayouts=process.env.ORDERS_DB_PATH?createManualPayouts(process.env.O
 const dashboardRoute=createDashboardRoute({access:dashboardAccess,findPartner,affiliates:refundOrders?.affiliates,liveAffiliates:liveOrders?.affiliates,payouts:manualPayouts});
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
+  ['/favicon.svg','image/svg+xml'],
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
   ['/product-gallery.js','text/javascript'], ['/site.css', 'text/css'], ['/brand.css', 'text/css'],
   ['/hero-products.png', 'image/png'], ['/fix-it-find-it-logo.png', 'image/png']
@@ -127,7 +128,7 @@ export const server = http.createServer(async (req, res) => {
   if (!['GET', 'HEAD'].includes(req.method)) return send(405, 'text/plain', 'Method not allowed');
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
-    if (path === '/partners' || path === '/partners/') return send(200,'text/html',launchCopy(partnerPage(renderStore()),liveCheckout.enabled()));
+    if (path === '/partners' || path === '/partners/') return send(200,'text/html',partnerPage(renderStore(),liveCheckout.enabled()));
     if (infoPages[path]) return send(200,'text/html',infoPage(renderStore(),infoPages[path]));
     if (path === '/health') return send(200, 'application/json', JSON.stringify({status:'ok'}));
     if (assets.has(path)) return send(200, assets.get(path), await readFile(resolve(root, path.slice(1))));
