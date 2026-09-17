@@ -23,3 +23,10 @@ test('paid order listing excludes sandbox and unpaid records',()=>{
  try{db.prepare('UPDATE orders SET status=? WHERE id=?').run('paid_live',paid.id);db.prepare('UPDATE orders SET status=? WHERE id=?').run('paid_sandbox',fake.id);assert.deepEqual(live.listPaid().map(r=>r.id),[paid.id]);assert.ok(!live.listPaid().some(r=>r.id===unpaid.id));}finally{db.close();live.close();sandbox.close();rmSync(dir,{recursive:true});}
 });
 test('owner empty screen does not imply launch readiness or live tracking',()=>{const html=ownerOrdersPage([]);assert.match(html,/No paid live orders yet/);assert.match(html,/does not contact CJ/);});
+
+test('tracking button requires owner session, CSRF and a submitted paid order',async()=>{
+ const access=createOwnerAccess(':memory:');let calls=[];const rows=[{id:'paid',product_name:'Attachment'}];const route=createOwnerOrdersRoute({access,orders:{listPaid:()=>rows,refunds:{summary:()=>({})}},worker:{summary:()=>({cjOrderId:'CJ1',state:'paid'})},tracking:{sync:async id=>calls.push(id)}});
+ const csrf='a'.repeat(48),token=access.login(access.issue(owner),find);
+ async function run(session,form){const req=Readable.from([form]);req.method='POST';req.headers={cookie:'fit_owner_csrf='+csrf+(session?'; fit_owner_session='+session:''),'content-type':'application/x-www-form-urlencoded'};const res={setHeader(){},writeHead(s){this.status=s;},end(b){this.body=b;}};await route(req,res,new URL('https://www.fixitfindit.com/owner/orders/sync'));return res;}
+ try{assert.equal((await run('', 'order=paid&csrf='+csrf)).status,401);assert.equal((await run(token,'order=paid')).status,403);assert.equal((await run(token,'order=unknown&csrf='+csrf)).status,400);assert.deepEqual(calls,[]);const r=await run(token,'order=paid&csrf='+csrf);assert.equal(r.status,200);assert.deepEqual(calls,['paid']);assert.match(r.body,/Tracking updated from CJ/);assert.match(r.body,/Sync tracking/);}finally{access.close();}
+});

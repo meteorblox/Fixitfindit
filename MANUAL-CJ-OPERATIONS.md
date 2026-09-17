@@ -33,3 +33,9 @@ Before paying a flagged order in MyCJ:
 CJ does not return all address fields, so changes to omitted fields cannot be detected automatically. The owner must review them in CJ immediately before each manual payment. Wallet payment remains disabled by default.
 
 The separate manual draft FIT-CJ-CHECK-001 is not a paid customer order in FixItFindIt and is not inserted into the live order ledger by these checks. Its API status was CREATED, isSandbox=0, one approved silver variant, product $4.59 plus $6.57 postage. The owner subsequently reported correcting a duplicated street address and missing ZIP; that correction has not been independently verified.
+
+## Tracking update — 2026-09-17
+
+The owner Orders page now provides Sync tracking on submitted orders. It requires an authenticated owner session and CSRF token. Active submitted orders are checked automatically every 15 minutes, up to 20 per cycle from the latest 200 supplier jobs; larger queues can take additional cycles. Delivered and cancelled orders stop automatic checks. Concurrent refreshes share a request and repeated manual refreshes are throttled. The separate tracking client exposes only CJ detail reads and cannot create, confirm or pay orders. This supersedes the earlier manual-only sync instructions. Supplier submission, address review and payment remain manual. No email notifications were added.
+
+The API-created unpaid diagnostic SD2609170810460650100 was verified with one silver attachment, $4.59 product plus $6.57 postage ($11.16 total), isSandbox=0 and CREATED with no payment date. The owner confirmed the address and ZIP in CJ. It is separate from the paid customer ledger.
