@@ -16,12 +16,12 @@ test('automatic catalog checkout carries trusted price through Stripe and a paid
   if(options.body){submitted=new URLSearchParams(options.body);const metadata={};for(const [k,v]of submitted)if(k.startsWith('metadata['))metadata[k.slice(9,-1)]=v;session={id:'cs_test_auto',livemode:false,url:'https://checkout.stripe.com/test',client_reference_id:owner,currency:'usd',status:'open',payment_status:'unpaid',amount_subtotal:2500,automatic_tax:{enabled:true,status:'requires_location_inputs'},metadata};}
   return {ok:true,json:async()=>session};
  }});
- const route=createProductCheckoutRoute({requireAddress:false,catalog:f.catalog,quotes,checkout});
+ const route=createProductCheckoutRoute({requireAddress:false,catalog:f.catalog,quotes,checkout,resolvePartner:()=>({id:'demo-home-helper',slug:'home-helper'})});
  const page=await run(route,'?product=p1&category=cleaning&variant=v1&zip=60601');assert.equal(page.status,200);assert.match(page.html,/Test brush/);assert.match(page.html,/name="product" value="p1"/);assert.match(page.headers['Set-Cookie'],new RegExp(owner));
  const quote=await run(route,'/quote','product=p1&category=cleaning&variant=v1&zip=60601&retailCents=1');assert.equal(quote.status,200);assert.match(quote.html,/\$25.00/);const id=quote.html.match(/name="quote" value="([^"]+)"/)[1];
- const started=await run(route,'/start','quote='+id+'&retailCents=1&product=other');assert.equal(started.status,303);assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2500');assert.equal(submitted.get('metadata[product_id]'),'p1');assert.equal(submitted.get('metadata[variant_id]'),'v1');
+ const started=await run(route,'/start','quote='+id+'&retailCents=1&product=other');assert.equal(started.status,303);assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2500');assert.equal(submitted.get('metadata[partner_id]'),'demo-home-helper');assert.equal(submitted.get('metadata[product_id]'),'p1');assert.equal(submitted.get('metadata[variant_id]'),'v1');
  session={...session,status:'complete',payment_status:'paid',amount_total:2700,total_details:{amount_shipping:0,amount_tax:200,amount_discount:0},automatic_tax:{enabled:true,status:'complete'},collected_information:{shipping_details:{address:{country:'US',postal_code:'60601'}}}};
- orders.recordSession(session,'evt_auto','checkout.session.completed');const paid=await checkout.verifyProduct(session.id,owner);assert.equal(paid.paid,true);assert.equal(paid.retailCents,2500);assert.equal(orders.get(session.metadata.order_id).status,'paid_sandbox');
+ orders.recordSession(session,'evt_auto','checkout.session.completed');const paid=await checkout.verifyProduct(session.id,owner);assert.equal(paid.paid,true);assert.equal(paid.retailCents,2500);assert.equal(orders.get(session.metadata.order_id).status,'paid_sandbox');assert.equal(orders.affiliates.summary(session.metadata.order_id).gross_cents,125);
  } finally {quotes.close();orders.close();}
 });
 test('automatic checkout rejects unknown membership, stale costs, stock loss and foreign quote owners',async()=>{

@@ -1,3 +1,4 @@
+import {affiliateStore} from './affiliate-store.mjs';
 import {refundStore} from './refund-store.mjs';
 import {sameRecipient} from './delivery-address.mjs';
 import {DatabaseSync} from 'node:sqlite';
@@ -24,19 +25,22 @@ export function createOrderStore(path,{mode='sandbox'}={}) {
     CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, received_at TEXT NOT NULL);`);
   const columns=new Set(db.prepare('PRAGMA table_info(orders)').all().map(c=>c.name));
   const fulfillment=fulfillmentStore(db);
-  for(const [name,type] of [['payment_intent','TEXT'],['mode',"TEXT NOT NULL DEFAULT 'sandbox'"],['automatic_tax','INTEGER NOT NULL DEFAULT 0'],['tax_cents','INTEGER'],['total_cents','INTEGER'],['shipping_cents','INTEGER NOT NULL DEFAULT 0'],['shipping_snapshot','TEXT'],['shipping_address_matches','INTEGER']]) if(!columns.has(name)) db.exec(`ALTER TABLE orders ADD COLUMN ${name} ${type}`);
+  for(const [name,type] of [['partner_id','TEXT'],['payment_intent','TEXT'],['mode',"TEXT NOT NULL DEFAULT 'sandbox'"],['automatic_tax','INTEGER NOT NULL DEFAULT 0'],['tax_cents','INTEGER'],['total_cents','INTEGER'],['shipping_cents','INTEGER NOT NULL DEFAULT 0'],['shipping_snapshot','TEXT'],['shipping_address_matches','INTEGER']]) if(!columns.has(name)) db.exec(`ALTER TABLE orders ADD COLUMN ${name} ${type}`);
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS order_payment_intent ON orders(payment_intent) WHERE payment_intent IS NOT NULL');
   const refunds=refundStore(db,mode);
+  const affiliates=affiliateStore(db,mode);
   function prepare(reference,item) {
     if(!reference || !item.productId || !item.variantId || !Number.isSafeInteger(item.retailCents) || item.retailCents<1) throw new Error('Invalid order.');
+    const partner=item.partner?.id||null;
+    if(partner&&(!/^[a-zA-Z0-9-]{1,100}$/.test(partner)||(mode==='live'&&partner.startsWith('demo-'))))throw Error('Invalid partner');
     const shipping=item.shipping;
     if(shipping && (!Number.isSafeInteger(shipping.cents)||shipping.cents<0||!/^\d{5}$/.test(shipping.zip)||!shipping.name||!item.quoteId)) throw new Error('Invalid shipping snapshot.');
-    const key=hash((mode==='live'?'live:':'')+reference+':'+item.variantId+(item.quoteId?':'+item.quoteId:''));
+    const key=hash((mode==='live'?'live:':'')+reference+':'+item.variantId+(item.quoteId?':'+item.quoteId:'')+(partner?':partner:'+partner:''));
     const now=new Date().toISOString();
-    db.prepare('INSERT OR IGNORE INTO orders(id,checkout_key,owner_hash,product_id,variant_id,product_name,retail_cents,created_at,updated_at,automatic_tax,shipping_cents,shipping_snapshot,mode) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(randomUUID(),key,hash(reference),item.productId,item.variantId,item.name,item.retailCents,now,now,item.automaticTax?1:0,shipping?.cents??0,shipping?JSON.stringify(shipping):null,mode);
+    db.prepare('INSERT OR IGNORE INTO orders(id,checkout_key,owner_hash,product_id,variant_id,product_name,retail_cents,created_at,updated_at,automatic_tax,shipping_cents,shipping_snapshot,mode,partner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(randomUUID(),key,hash(reference),item.productId,item.variantId,item.name,item.retailCents,now,now,item.automaticTax?1:0,shipping?.cents??0,shipping?JSON.stringify(shipping):null,mode,partner);
     const row=db.prepare('SELECT * FROM orders WHERE checkout_key=?').get(key);
-    if(row.mode!==mode || row.retail_cents!==item.retailCents || row.product_id!==item.productId || row.automatic_tax!==(item.automaticTax?1:0) || row.shipping_cents!==(shipping?.cents??0) || row.shipping_snapshot!==(shipping?JSON.stringify(shipping):null)) throw new Error('Price changed. Start a fresh checkout.');
+    if(row.partner_id!==partner || row.mode!==mode || row.retail_cents!==item.retailCents || row.product_id!==item.productId || row.automatic_tax!==(item.automaticTax?1:0) || row.shipping_cents!==(shipping?.cents??0) || row.shipping_snapshot!==(shipping?JSON.stringify(shipping):null)) throw new Error('Price changed. Start a fresh checkout.');
     return row;
   }
   function recordSession(s,eventId=null,eventType='') {
@@ -47,6 +51,7 @@ export function createOrderStore(path,{mode='sandbox'}={}) {
       if(eventId && db.prepare('SELECT id FROM stripe_events WHERE id=?').get(eventId)) {db.exec('COMMIT');return;}
       const row=db.prepare('SELECT * FROM orders WHERE id=?').get(m.order_id||'');
       if(!row || row.mode!==mode || row.owner_hash!==hash(s.client_reference_id||'') || row.product_id!==m.product_id || row.variant_id!==m.variant_id || m.quantity!=='1' || String(row.retail_cents)!==m.retail_cents || s.currency!=='usd' || (row.session_id && row.session_id!==s.id)) throw new Error('Order snapshot mismatch.');
+      if((row.partner_id||'')!==(m.partner_id||''))throw Error('Partner attribution mismatch');
       if(row.shipping_snapshot && m.shipping_cents!==String(row.shipping_cents)) throw new Error('Shipping snapshot mismatch.');
       const pi=typeof s.payment_intent==='string'?s.payment_intent:s.payment_intent?.id;
       if(pi){if(!/^pi_[a-zA-Z0-9]+$/.test(pi)||(row.payment_intent&&row.payment_intent!==pi))throw Error('Payment identity mismatch');db.prepare('UPDATE orders SET payment_intent=? WHERE id=?').run(pi,row.id);}
@@ -64,11 +69,12 @@ export function createOrderStore(path,{mode='sandbox'}={}) {
       if(mode==='sandbox' && eventId && ['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(eventType) && s.status==='complete' && s.payment_status==='paid') {
         fulfillment.enqueue({...row,status},s);
       }
+      if(eventId&&['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(eventType)&&s.status==='complete'&&s.payment_status==='paid')affiliates.accrue({...row,status});
       db.exec('COMMIT');
       return {id:row.id,status};
     } catch(error) {db.exec('ROLLBACK');throw error;}
   }
-  return {prepare,recordSession,fulfillment,refunds,get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
+  return {prepare,recordSession,fulfillment,refunds,affiliates,get:id=>db.prepare('SELECT * FROM orders WHERE id=?').get(id),hasWebhook:id=>Boolean(db.prepare('SELECT id FROM stripe_events WHERE order_id=? LIMIT 1').get(id)),close:()=>db.close()};
 }
 
 // No temporary disk fallback: without a configured mount, existing sandbox

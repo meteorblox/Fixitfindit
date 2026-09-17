@@ -65,6 +65,7 @@ export function createCheckout({key = process.env.STRIPE_SECRET_KEY, request = f
         'metadata[purpose]':'fixitfindit-product-sandbox',
         'metadata[product_id]':item.productId,'metadata[variant_id]':item.variantId,
         'metadata[retail_cents]':String(item.retailCents),'metadata[quantity]':'1',
+        ...(order?.partner_id?{'metadata[partner_id]':order.partner_id}:{}),
         'metadata[store_id]':'fixitfindit','metadata[fulfillment]':'sandbox-do-not-ship',
         ...(order?{'metadata[order_id]':order.id}:{}),
         'custom_text[submit][message]':'Test only. No shipment or commission. Applicable tax is calculated from the shipping address.',

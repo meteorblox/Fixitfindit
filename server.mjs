@@ -1,3 +1,4 @@
+import {referralToken} from './affiliate-store.mjs';
 import {createRefundTracking} from './refund-tracking.mjs';
 import {orders as refundOrders} from './orders.mjs';
 import {createProductionWebhookRoute} from './production-webhook.mjs';
@@ -23,7 +24,7 @@ import { createProductCheckoutRoute } from './product-checkout.mjs';
 import {createWebhookRoute} from './stripe-webhook.mjs';
 const catalog = createPricedCatalog(createCatalog(),{path:process.env.ORDERS_DB_PATH||':memory:'});
 const checkoutService=createCheckout();
-const productCheckoutRoute = createProductCheckoutRoute({catalog,checkout:checkoutService});
+const productCheckoutRoute = createProductCheckoutRoute({catalog,checkout:checkoutService,resolvePartner:req=>refundOrders?.affiliates.resolve(referralToken(req),findPartner)});
 const webhookRoute=createWebhookRoute({resolveSession:checkoutService.retrieve,refundTracking:refundOrders?createRefundTracking({orders:refundOrders,resolveSession:checkoutService.retrieve}):null});
 const liveIntake=process.env.LIVE_ORDER_INTAKE==='enabled' && Boolean(process.env.ORDERS_DB_PATH);
 const liveOrders=liveIntake?createOrderStore(process.env.ORDERS_DB_PATH,{mode:'live'}):null;
@@ -44,6 +45,7 @@ for (const store of stores) {
   }
   slugs.add(store.slug); ids.add(store.id);
 }
+const findPartner=slug=>partnerStore?.find(slug)||stores.find(s=>s.slug===slug);
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assets = new Map([
   ...categories.map(c => ['/category-' + c.slug + '.svg', 'image/svg+xml']),
@@ -88,6 +90,8 @@ export const server = http.createServer(async (req, res) => {
       'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin'});
     res.end(req.method === 'HEAD' ? undefined : body);
   };
+  const referralPath=new URL(req.url,'http://localhost').pathname.match(/^\/shop\/([a-z0-9-]+)(?:\/|$)/);
+  if(req.method==='GET'&&referralPath&&refundOrders){const partner=findPartner(referralPath[1]);if(partner){try{const token=refundOrders.affiliates.visit(partner);res.setHeader('Set-Cookie','fit_referral='+token+'; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000');}catch{/* Store browsing remains available if referral storage fails. */}}}
   if (await applicationRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await checkoutRoute(req,res,new URL(req.url,'http://localhost'))) return;
   if (await productionWebhook(req,res,new URL(req.url,'http://localhost'))) return;
@@ -121,7 +125,7 @@ export const server = http.createServer(async (req, res) => {
           catch(e) { options.shippingError=e.message; }
         }
         page=page.replace('<strong>Not available to purchase yet</strong>',productOptions(options)+'<strong>Not available to purchase yet</strong>');
-        if(!store && !product.checkoutHold && options.details) {
+        if(!product.checkoutHold && options.details) {
           const available=product.pricedVariants||product.storefrontVariants||(product.pricingPending?[]:options.details.variants.filter(v=>Number.isSafeInteger(v.stock)&&v.stock>0&&Number.isSafeInteger(v.price)));
           const chosen=available.find(v=>v.id===options.vid)||available[0];
           if(chosen)

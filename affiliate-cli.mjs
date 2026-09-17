@@ -1,0 +1,2 @@
+import {orders} from './orders.mjs';
+try{const [action,id]=process.argv.slice(2);if(!orders||!id||!['order','partner'].includes(action))throw Error('Usage: node affiliate-cli.mjs order ORDER_ID | partner PARTNER_ID');console.log(JSON.stringify(action==='order'?orders.affiliates.summary(id):orders.affiliates.list(id),null,2));}catch(e){console.error(e.message);process.exitCode=1;}finally{orders?.close();}

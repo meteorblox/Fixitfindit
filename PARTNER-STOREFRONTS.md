@@ -14,3 +14,11 @@ Before enabling partners:
 - Verify custom domains individually before routing them to a partner.
 
 Railway can use `npm start`; server listens on `PORT` (default 8080). Health endpoint: `/health`. Tests: `npm test`.
+
+## Sandbox attribution and commissions
+
+Approved partner storefronts and the explicit home-helper demo can test attribution. GET visits set an opaque HttpOnly/Secure/SameSite=Lax 30-day cookie. Only its hashed token and partner reference are stored; unsigned partner IDs in forms are ignored. Most recent storefront visit wins until a shipping quote freezes attribution. Partner approval is rechecked when resolving the cookie; visiting the main store does not clear it. Blocking cookies or using another browser prevents attribution.
+
+The order and Stripe metadata retain the partner ID. A signed successful payment event accrues one 500-basis-point commission record per order. Product subtotal is the basis; sales tax and separately charged shipping are excluded. Fractional cents round down. Refund-adjusted earnings are computed from the persisted refund ledger, allocating a refund proportionally across the original total paid. Pending refunds are flagged for review. Duplicate events cannot add another commission. Sandbox amounts are simulations and every payable amount remains zero; payouts are not implemented.
+
+Private operator commands: node affiliate-cli.mjs order ORDER_ID or node affiliate-cli.mjs partner PARTNER_ID. Neither is exposed as a public endpoint. No historical orders receive retroactive attribution. Partner dashboards, payout schedules, payout authorization, chargeback adjustments and production eligibility/review remain launch work.
