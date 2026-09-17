@@ -11,3 +11,11 @@ The route rejects old pricing quotes, rechecks price/stock, and checks the chose
 Supplier quotes are cached for up to one minute and product details for five minutes in the storefront. Quotes are ZIP estimates, not guaranteed full-address landed costs; final supplier charges, address changes, quote/session expiry alignment and production controls remain launch work. The budget floor protects the stated model only.
 
 All 43 automated tests pass, including zero customer shipping with persisted supplier freight, signed payment-to-fulfillment, cost increases preventing supplier creation, owner-approved exact pan variant, unknown fee rejection, price tampering, and legacy paid-order verification. These tests use fixtures; a deployed checkout check follows publication.
+
+## Automatic catalog pricing
+
+Unpriced catalog variants can obtain a destination-specific delivered retail quote on their product page. The rule is 100% markup on verified supplier cost plus confirmed total freight, rounded upward to a whole dollar, raised further if necessary to leave $5 modeled contribution. Existing approved variants retain their exact prices and option restrictions. Unknown stock, missing fees, unsupported quantities, and invalid ZIPs return no price. Known CJ dispute-excluded shipping line families are filtered from automatic catalog quotes; this does not certify coverage for any remaining method.
+
+This is catalog quote support, not production checkout enablement. General catalog variants are not yet connected to checkout or fulfillment. Only the previously approved variants have sandbox checkout. No live credentials, real supplier payments, or live order submission have been enabled. Advertising, overhead, exceptional returns and final supplier charges can still reduce profit. Before live sales, complete full-address pricing, payment/quote expiry alignment, production payment and fulfillment integration, refund operations, customer-facing policies and the affiliate ledger.
+
+Customer support contact supplied by the owner: fixitfindits@gmail.com. Published on Contact; mailbox delivery has not been tested.

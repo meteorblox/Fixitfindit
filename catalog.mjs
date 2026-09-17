@@ -109,7 +109,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
     if(!/^\d{5}$/.test(zip) || !Number.isInteger(quantity) || quantity<1 || quantity>10) throw new Error('Enter a five-digit US ZIP code and quantity from 1 to 10.');
     const details=await detail(slug,id);
     const variant=details.variants.find(v=>v.id===vid);
-    if(!variant || variant.stock<quantity || variant.price===null) throw new Error('This option does not have confirmed stock for that quantity.');
+    if(!variant || !Number.isSafeInteger(variant.stock) || variant.stock<quantity || !Number.isSafeInteger(variant.price) || variant.price<0) throw new Error('This option does not have confirmed stock for that quantity.');
     // Bound the quote cache so arbitrary ZIP codes cannot grow memory indefinitely.
     if(cache.size>500) for(const key of cache.keys()) if(key.startsWith('ship:')) cache.delete(key);
     return cached(`ship:${vid}:${zip}:${quantity}`,60000,async()=>{
