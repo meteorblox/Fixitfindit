@@ -39,3 +39,21 @@ test('unpriced products are excluded from customer collection cards',()=>{
  const html=catalogPage('<head></head><main id="top"></main>',{category:{slug:'cleaning',name:'Cleaning'},data:{updatedAt:'today',products:[{id:'ready',name:'Ready brush',retailCents:3300},{id:'waiting',name:'Unpriced brush',pricingPending:true}]}});
  assert.ok(html.includes('Ready brush'));assert.ok(!html.includes('Unpriced brush'));assert.ok(html.includes('$33.00'));
 });
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+test('catalog persists across restarts, serves stale display data, but never stale inventory',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'cj-cache-'));const path=join(dir,'cache.sqlite');let now=0,calls=0;
+ const request=async url=>({ok:true,json:async()=>({result:true,data:url.includes('getAccessToken')?{accessToken:'test',accessTokenExpiryDate:'2099-01-01'}:{content:[{productList:[{id:'brush',nameEn:'Brush'}]}]}})});
+ const first=createCatalog({path,apiKey:'test',interval:0,now:()=>now,request});await first.list('cleaning');first.close();
+ const second=createCatalog({path,apiKey:'test',interval:0,now:()=>now,request:async()=>{calls++;throw new Error('offline');}});
+ assert.equal((await second.list('cleaning')).products[0].id,'brush');assert.equal(calls,0);
+ now=7*3600000;assert.equal((await second.list('cleaning')).stale,true);
+ await assert.rejects(second.detail('cleaning','brush'));second.close();rmSync(dir,{recursive:true});
+});
+test('exhausted allowance persists cooldown and retains owner selected product prices',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'cj-quota-'));const path=join(dir,'cache.sqlite');let calls=0;
+ const request=async url=>{calls++;return {ok:true,json:async()=>url.includes('getAccessToken')?{result:true,data:{accessToken:'test'}}:{result:false,code:16000500}};};
+ const first=createCatalog({path,apiKey:'test',interval:0,request});const data=await first.list('kitchen');assert.equal(data.stale,true);assert.equal(data.products.find(p=>p.id==='2035225150855884801').retailCents,12700);first.close();
+ const before=calls;const second=createCatalog({path,apiKey:'test',interval:0,request});await assert.rejects(second.list('cleaning'));assert.equal(calls,before);second.close();rmSync(dir,{recursive:true});
+});

@@ -1,3 +1,4 @@
+import {DatabaseSync} from 'node:sqlite';
 import {isReplacementPart} from './catalog-policy.mjs';
 import {selectedProducts} from './selected-products.mjs';
 import {normalizeShipping} from './shipping-quotes.mjs';
@@ -9,16 +10,24 @@ export const categories = [
   {slug:'home-improvement',name:'Home Improvement',query:'home improvement',extraQueries:['faucet','door hardware','wall repair']}
 ];
 const base = 'https://developers.cjdropshipping.com/api2.0/v1';
-export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch, now = Date.now, interval = 1100} = {}) {
+export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch, now = Date.now, interval = 1100, path = process.env.ORDERS_DB_PATH || ":memory:"} = {}) {
   let token, tokenExpires = 0, queue = Promise.resolve(), nextCall = 0;
   const cache = new Map(), pending = new Map();
+  const db=new DatabaseSync(path);
+  db.exec('PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS catalog_snapshots (key TEXT PRIMARY KEY, expires INTEGER NOT NULL, value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS catalog_cooldown (id INTEGER PRIMARY KEY, until_ms INTEGER NOT NULL)');
+  let blockedUntil=Number(db.prepare('SELECT until_ms FROM catalog_cooldown WHERE id=1').get()?.until_ms)||0;
+  function snapshot(key){const row=db.prepare('SELECT * FROM catalog_snapshots WHERE key=?').get(key);return row?{expires:row.expires,value:JSON.parse(row.value)}:null;}
+  function persist(key,value,ttl){db.prepare('INSERT OR REPLACE INTO catalog_snapshots VALUES(?,?,?)').run(key,now()+ttl,JSON.stringify(value));}
+  function mergeSelected(slug,products=[]){const selected=selectedProducts.filter(p=>p.category===slug);return [...selected.map(p=>({...products.find(x=>x.id===p.lookup.pid),...p,id:p.lookup.pid})),...products.filter(p=>!selected.some(s=>s.lookup.pid===p.id))];}
   async function call(path, options = {}) {
     const task = queue.then(async () => {
+      if(blockedUntil>now()) throw new Error('CJ API allowance is temporarily unavailable.');
       await new Promise(resolve => setTimeout(resolve, Math.max(0, nextCall - now())));
       nextCall = now() + interval;
       const response = await request(base + path, {...options, signal:AbortSignal.timeout(15000)});
       if (!response.ok) throw new Error('CJ is temporarily unavailable. Please try again later.');
       const data = await response.json();
+      if(data.code===16000500){blockedUntil=now()+30*60000;db.prepare('INSERT OR REPLACE INTO catalog_cooldown VALUES(1,?)').run(blockedUntil);throw new Error('CJ API allowance is temporarily unavailable.');}
       if (data.result !== true && !(path.startsWith('/product/stock/getInventoryByPid?') && data.success === true && data.result !== false)) throw new Error('CJ could not load the catalog. Check account access and API quota.');
       return data.data;
     });
@@ -38,10 +47,10 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
   async function list(slug) {
     const category = categories.find(c => c.slug === slug);
     if (!category) throw new Error('Unknown category');
-    const saved = cache.get(slug);
+    const saved = cache.get(slug) || snapshot(slug);
     if (saved && saved.expires > now()) {
       if (saved.error) throw new Error(saved.error);
-      return saved.value;
+      return {...saved.value,products:mergeSelected(slug,saved.value.products)};
     }
     if (pending.has(slug)) return pending.get(slug);
     const work = (async () => {
@@ -87,10 +96,14 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
           }
         }
         const value = {products,updatedAt:new Date(now()).toISOString()};
+        persist(slug,value,6*3600000);
         cache.set(slug,{value,expires:now()+6*3600000});
         return value;
       } catch (error) {
         const message = apiKey ? 'Catalog temporarily unavailable. Please try again later.' : 'The CJ catalog connection is not configured on this server yet.';
+        const previous=snapshot(slug);
+        const products=mergeSelected(slug,previous?.value.products);
+        if(products.length){const value={products,updatedAt:previous?.value.updatedAt||null,stale:true};cache.set(slug,{value,expires:now()+60000});return value;}
         cache.set(slug,{error:message,expires:now()+60000});
         throw new Error(message);
       } finally { pending.delete(slug); }
@@ -114,7 +127,11 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
     if(!product) throw new Error('Unknown product');
     return cached('media-data:'+id,5*60000,async()=>{const access=await authenticate();return call('/product/query?'+new URLSearchParams({pid:id,countryCode:product.origin||'US'}),{headers:{'CJ-Access-Token':access}});});
   }
-  async function images(slug,id) { return productImages(await productData(slug,id)); }
+  async function images(slug,id) {
+    const saved=snapshot('images:'+id);
+    if(saved?.expires>now())return saved.value;
+    try{const value=productImages(await productData(slug,id));persist('images:'+id,value,24*3600000);return value;}catch(error){if(saved)return saved.value;throw error;}
+  }
   async function detail(slug,id) {
     const product=selectedProducts.find(p=>p.category===slug && p.lookup.pid===id) || (await list(slug)).products.find(p=>p.id===id);
     if(!product) throw new Error('Unknown product');
@@ -141,7 +158,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       return data.map(row=>normalizeShipping(row,{origin:details.origin,destination:'US'})).filter(r=>r.name && r.price!==null).sort((a,b)=>(a.totalCents??a.price)-(b.totalCents??b.price));
     });
   }
-  return {list,detail,shipping,images};
+  return {list,detail,shipping,images,close(){db.close();}};
 }
 export function money(value) { if(value===null || value===undefined || value==='') return null; const n=Number(value); return Number.isFinite(n)&&n>=0?Math.round(n*100):null; }
 export function usStock(rows,vid,country='US') {

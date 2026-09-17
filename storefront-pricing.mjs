@@ -45,7 +45,7 @@ export function createPricedCatalog(raw,{path=':memory:',now=Date.now}={}) {
  }
  return {
   ...raw,
-  async list(category){const data=await raw.list(category);for(const p of data.products)schedule(p,category);return {...data,products:data.products.map(decorate)};},
+  async list(category){const data=await raw.list(category);if(!data.stale)for(const p of data.products)schedule(p,category);return {...data,products:data.products.map(decorate)};},
   storefrontPrice(productId,variantId){const price=saved(productId);return price?.variantId===variantId?price:null;},
   async settled(){await queue;},close(){db.close();}
  };
