@@ -14,7 +14,7 @@ export function verifyStripeEvent(raw,header,secret,now=Date.now(),mode='sandbox
   return event;
 }
 
-export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRIPE_WEBHOOK_SECRET}={}) {
+export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRIPE_WEBHOOK_SECRET,resolveSession}={}) {
   return async(req,res,url)=>{
     if(url.pathname!=='/webhooks/stripe') return false;
     const send=code=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({received:code===200}));};
@@ -27,9 +27,9 @@ export function createWebhookRoute({orders=defaultOrders,secret=process.env.STRI
       event=verifyStripeEvent(Buffer.concat(chunks),req.headers['stripe-signature'],secret);
     } catch {send(400);return true;}
     const supported=['checkout.session.completed','checkout.session.async_payment_succeeded','checkout.session.async_payment_failed','checkout.session.expired'];
-    const session=event.data?.object;
+    let session=event.data?.object;
     if(!supported.includes(event.type) || session?.metadata?.purpose!=='fixitfindit-product-sandbox' || !session.metadata.order_id) {send(200);return true;}
-    try {orders.recordSession(session,event.id,event.type);send(200);}
+    try {if(session.metadata?.address_mode==='fixed'){if(!resolveSession)throw new Error('Session resolver unavailable');const resolved=await resolveSession(session.id);if(resolved.id!==session.id)throw new Error('Session mismatch');session=resolved;}orders.recordSession(session,event.id,event.type);send(200);}
     catch {send(503);} // Return a failure so Stripe retries instead of losing an order.
     return true;
   };

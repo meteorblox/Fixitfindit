@@ -1,3 +1,4 @@
+import {sameRecipient} from './delivery-address.mjs';
 import {selectedProducts} from './selected-products.mjs';
 import {requireIncludedMargin} from './pricing-policy.mjs';
 
@@ -15,6 +16,7 @@ export function sandboxPayload(order,session) {
   if(quote.pricingVersion) requireIncludedMargin({retailCents:order.retail_cents,supplierCents:quote.supplierProductCents,shipping:quote},Math.max(order.tax_cents||0,Math.ceil(order.retail_cents*.105)));
   const shipping=session.collected_information?.shipping_details||session.shipping_details;
   const address=shipping?.address;
+  if(quote.recipient&&!sameRecipient(quote.recipient,shipping))throw new Error('shipping_address_mismatch');
   if(address?.country!=='US' || !/^\d{5}(?:-\d{4})?$/.test(address?.postal_code||'') || address.postal_code.slice(0,5)!==quote.zip) throw new Error('shipping_address_mismatch');
   if(quote.origin!==product.origin || !Number.isSafeInteger(quote.cents) || quote.cents!==order.shipping_cents) throw new Error('invalid_shipping_quote');
   return {

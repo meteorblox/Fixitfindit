@@ -52,7 +52,7 @@ test('route rejects cross-origin posts and ignores client supplied prices',async
   let captured;
   const quotes=createQuoteStore(':memory:');
   const quote=quotes.save('12345678-1234-1234-1234-123456789abc',includedShipping(await checkoutItem(catalog,vid),{name:'Standard',totalCents:650,feesConfirmed:true},'60601'));
-  const route=createProductCheckoutRoute({catalog,quotes,checkout:{enabled:()=>true,startProduct:async(o,r,item)=>{captured=item;return 'https://checkout.stripe.com/test';}}});
+  const route=createProductCheckoutRoute({requireAddress:false,catalog,quotes,checkout:{enabled:()=>true,startProduct:async(o,r,item)=>{captured=item;return 'https://checkout.stripe.com/test';}}});
   const run=async(origin)=>{
     const req=Readable.from([`quote=${quote.quoteId}&variant=${vid}&retailCents=1&shippingCents=1&quantity=100`]);
     req.method='POST';req.headers={origin,cookie:'fit_product=12345678-1234-1234-1234-123456789abc','content-type':'application/x-www-form-urlencoded'};

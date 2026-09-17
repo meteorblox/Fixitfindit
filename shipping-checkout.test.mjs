@@ -49,7 +49,7 @@ test('quote to Stripe to paid order preserves shipping, ignores browser amounts 
     }
     return {ok:true,json:async()=>session};
   }});
-  const route=createProductCheckoutRoute({catalog,quotes,checkout});
+  const route=createProductCheckoutRoute({requireAddress:false,catalog,quotes,checkout});
   const post=async(path,body,cookie=owner)=>{
     const req=Readable.from([body]);req.method='POST';req.headers={origin:'https://www.fixitfindit.com',cookie:'fit_product='+cookie,'content-type':'application/x-www-form-urlencoded'};
     const res={writeHead(status,headers){this.status=status;this.headers=headers;},end(html){this.html=html;}};

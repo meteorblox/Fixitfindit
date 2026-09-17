@@ -1,3 +1,4 @@
+import {sameRecipient} from './delivery-address.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash,randomUUID} from 'node:crypto';
 import {mkdirSync} from 'node:fs';
@@ -50,7 +51,7 @@ export function createOrderStore(path,{mode='sandbox'}={}) {
       if(s.status==='complete' && s.payment_status==='paid' && row.shipping_snapshot) {
         const expected=JSON.parse(row.shipping_snapshot);
         const address=s.collected_information?.shipping_details?.address||s.shipping_details?.address;
-        const matches=address?.country==='US' && address?.postal_code?.slice(0,5)===expected.zip;
+        const matches=expected.recipient?sameRecipient(expected.recipient,s.collected_information?.shipping_details||s.shipping_details):address?.country==='US' && address?.postal_code?.slice(0,5)===expected.zip;
         db.prepare('UPDATE orders SET shipping_address_matches=? WHERE id=?').run(matches?1:0,row.id);
       }
       if(row.status!==paidStatus) db.prepare('UPDATE orders SET tax_cents=COALESCE(?,tax_cents),total_cents=COALESCE(?,total_cents) WHERE id=?').run(totals.taxCents,totals.totalCents,row.id);

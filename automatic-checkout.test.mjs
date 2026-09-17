@@ -16,7 +16,7 @@ test('automatic catalog checkout carries trusted price through Stripe and a paid
   if(options.body){submitted=new URLSearchParams(options.body);const metadata={};for(const [k,v]of submitted)if(k.startsWith('metadata['))metadata[k.slice(9,-1)]=v;session={id:'cs_test_auto',livemode:false,url:'https://checkout.stripe.com/test',client_reference_id:owner,currency:'usd',status:'open',payment_status:'unpaid',amount_subtotal:2500,automatic_tax:{enabled:true,status:'requires_location_inputs'},metadata};}
   return {ok:true,json:async()=>session};
  }});
- const route=createProductCheckoutRoute({catalog:f.catalog,quotes,checkout});
+ const route=createProductCheckoutRoute({requireAddress:false,catalog:f.catalog,quotes,checkout});
  const page=await run(route,'?product=p1&category=cleaning&variant=v1&zip=60601');assert.equal(page.status,200);assert.match(page.html,/Test brush/);assert.match(page.html,/name="product" value="p1"/);assert.match(page.headers['Set-Cookie'],new RegExp(owner));
  const quote=await run(route,'/quote','product=p1&category=cleaning&variant=v1&zip=60601&retailCents=1');assert.equal(quote.status,200);assert.match(quote.html,/\$25.00/);const id=quote.html.match(/name="quote" value="([^"]+)"/)[1];
  const started=await run(route,'/start','quote='+id+'&retailCents=1&product=other');assert.equal(started.status,303);assert.equal(submitted.get('line_items[0][price_data][unit_amount]'),'2500');assert.equal(submitted.get('metadata[product_id]'),'p1');assert.equal(submitted.get('metadata[variant_id]'),'v1');
@@ -26,7 +26,7 @@ test('automatic catalog checkout carries trusted price through Stripe and a paid
 });
 test('automatic checkout rejects unknown membership, stale costs, stock loss and foreign quote owners',async()=>{
  const f=fixture();await assert.rejects(checkoutItem(f.catalog,'v1',{category:'cleaning',productId:'missing'}));await assert.rejects(checkoutItem(f.catalog,'wrong',{category:'cleaning',productId:'p1'}));await assert.rejects(checkoutItem(f.catalog,'v1',{category:'unknown',productId:'p1'}));await assert.rejects(checkoutItem(f.catalog,'v1',{category:'kitchen',productId:'1696373349800226816'}));
- const quotes=createQuoteStore(':memory:');let calls=0;const route=createProductCheckoutRoute({catalog:f.catalog,quotes,checkout:{enabled:()=>true,startProduct:async()=>{calls++;return 'https://checkout.stripe.com/test'}}});
+ const quotes=createQuoteStore(':memory:');let calls=0;const route=createProductCheckoutRoute({requireAddress:false,catalog:f.catalog,quotes,checkout:{enabled:()=>true,startProduct:async()=>{calls++;return 'https://checkout.stripe.com/test'}}});
  try {const page=await run(route,'/quote','product=p1&category=cleaning&variant=v1&zip=60601');const id=page.html.match(/name="quote" value="([^"]+)"/)[1];
  assert.equal((await run(route,'/start','quote='+id,'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')).status,409);
  f.setFreight(501);assert.equal((await run(route,'/start','quote='+id)).status,409);
