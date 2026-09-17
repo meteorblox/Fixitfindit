@@ -5,8 +5,8 @@ export const categories = [
   {slug:'kitchen',name:'Kitchen',query:'kitchen'},
   {slug:'cleaning',name:'Cleaning',query:'cleaning'},
   {slug:'organization',name:'Organization',query:'organizer'},
-  {slug:'tools',name:'Tools',query:'hand tool'},
-  {slug:'home-improvement',name:'Home Improvement',query:'home improvement'}
+  {slug:'tools',name:'Tools',query:'hand tool',extraQueries:['screwdriver','wrench']},
+  {slug:'home-improvement',name:'Home Improvement',query:'home improvement',extraQueries:['faucet','door hardware','wall repair']}
 ];
 const base = 'https://developers.cjdropshipping.com/api2.0/v1';
 export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch, now = Date.now, interval = 1100} = {}) {
@@ -48,9 +48,10 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
       try {
         const access = await authenticate();
         const products = [], seen = new Set();
-        const expanded=['cleaning','organization'].includes(slug);
-        for(let page=1;page<=(expanded?3:1);page++) {
-          const params=new URLSearchParams({page:String(page),size:'24',keyWord:category.query,countryCode:'US',orderBy:'1',sort:'desc',...(expanded?{verifiedWarehouse:'1',startWarehouseInventory:'1'}:{})});
+        const expanded=['cleaning','organization','tools','home-improvement'].includes(slug);
+        for(const keyword of [category.query,...(category.extraQueries||[])]) {
+        for(let page=1;page<=(keyword===category.query&&expanded?3:1);page++) {
+          const params=new URLSearchParams({page:String(page),size:'24',keyWord:keyword,countryCode:'US',orderBy:'1',sort:'desc',...(expanded?{verifiedWarehouse:'1',startWarehouseInventory:'1'}:{})});
           let result;
           try {result=await call('/product/listV2?'+params,{headers:{'CJ-Access-Token':access}});} catch(error) {if(page===1)throw error;break;}
           if(!Array.isArray(result?.content)) {if(page===1)throw new Error('Invalid catalog format');break;}
@@ -59,6 +60,7 @@ export function createCatalog({apiKey = process.env.CJ_API_KEY, request = fetch,
             seen.add(String(p.id));products.push({id:String(p.id),name:String(p.nameEn),image:safeImage(p.bigImage),supplierPrice:String(p.sellPrice??''),listings:Number(p.listedNum)||0,hasVideo:p.isVideo===1,category:slug});
           }
           if(rows.length<24 || (Number.isFinite(result.totalPages)&&page>=result.totalPages))break;
+        }
         }
         // Preserve the established first-page options while expanding discovery.
         if(expanded) {
