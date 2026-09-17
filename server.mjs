@@ -1,3 +1,4 @@
+import {createOwnerEmailLogin} from './owner-email.mjs';
 import {createTrackingSync} from './tracking-sync.mjs';
 import {salesOpen,launchCopy,purchaseLink} from './launch-presentation.mjs';
 import {createCustomerTracking,createTrackingRoute} from './customer-tracking.mjs';
@@ -40,7 +41,8 @@ const trackingCj=createProductionCj({enabled:true,paymentMode:'manual'});
 const trackingWorker=liveIntake?createProductionFulfillment({path:process.env.ORDERS_DB_PATH,orders:liveOrders,catalog,cj:{enabled:trackingCj.enabled,detail:trackingCj.detail},enabled:true}):null;
 const trackingSync=trackingWorker?createTrackingSync({worker:trackingWorker}):null;
 trackingSync?.start();
-const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker,tracking:trackingSync});
+const ownerEmail=liveIntake?createOwnerEmailLogin({path:process.env.ORDERS_DB_PATH}):null;
+const ownerRoute=createOwnerOrdersRoute({access:ownerAccess,orders:liveOrders,worker:liveWorker,tracking:trackingSync,emailLogin:ownerEmail});
 const liveReady=process.env.CJ_PRODUCTION_FULFILLMENT==='enabled' && liveIntake && process.env.LIVE_CHECKOUT==='enabled' && Boolean(process.env.STRIPE_LIVE_WEBHOOK_SECRET?.startsWith('whsec_'));
 const liveCheckout=createCheckout({key:process.env.STRIPE_LIVE_SECRET_KEY,orders:liveOrders,mode:'live',allowLive:liveReady});
 const liveRefundTracking=liveOrders?createRefundTracking({orders:liveOrders,key:process.env.STRIPE_LIVE_SECRET_KEY,mode:'live',resolveSession:liveCheckout.retrieve}):null;
