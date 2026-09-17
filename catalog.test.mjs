@@ -34,3 +34,8 @@ test('expanded US collections page through results and deduplicate supplier IDs'
  const data=await catalog.list(slug);assert.deepEqual(pages,['1','2','3']);assert.equal(data.products.length,70);
  }
 });
+
+test('unpriced products are excluded from customer collection cards',()=>{
+ const html=catalogPage('<head></head><main id="top"></main>',{category:{slug:'cleaning',name:'Cleaning'},data:{updatedAt:'today',products:[{id:'ready',name:'Ready brush',retailCents:3300},{id:'waiting',name:'Unpriced brush',pricingPending:true}]}});
+ assert.ok(html.includes('Ready brush'));assert.ok(!html.includes('Unpriced brush'));assert.ok(html.includes('$33.00'));
+});

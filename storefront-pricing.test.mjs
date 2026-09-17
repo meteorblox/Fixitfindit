@@ -44,3 +44,8 @@ test('an unshippable cheap option does not hide another complete stocked option'
  const raw=supplier();raw.detail=async()=>({origin:'US',variants:[{id:'cheap',name:'Red',stock:4,price:100},{id:'blue',name:'Blue',stock:4,price:500}]});const ship=raw.shipping;raw.shipping=async(c,p,v,z)=>v==='cheap'?[]:ship(c,p,v,z);
  const catalog=createPricedCatalog(raw);try{await catalog.list('cleaning');await catalog.settled();assert.equal((await catalog.list('cleaning')).products[0].storefrontVariants[0].id,'blue');}finally{catalog.close();}
 });
+
+test('pricing alternates categories rather than draining one collection first',async()=>{
+ const order=[];const raw=supplier();raw.list=async category=>({products:[1,2,3].map(n=>({id:category+n,name:'Brush'}))});const detail=raw.detail;raw.detail=async(c,p)=>{order.push(c);return detail(c,p)};const catalog=createPricedCatalog(raw);
+ try{await catalog.list('cleaning');await catalog.list('organization');await catalog.settled();assert.ok(order.indexOf('organization')<3);}finally{catalog.close();}
+});
