@@ -107,5 +107,6 @@ export function quoteItem(item,method,zip) {
   if(!eligibleMethod(method)) return null;
   const retailCents=item.automatic&&!item.fixedRetail?automaticRetail(item.supplierCents,method.totalCents):item.retailCents;
   if(item.automatic && contribution(retailCents,item.supplierCents,method.totalCents)<minimumContributionCents) return null;
-  return includedShipping({...item,retailCents},method,zip);
+  const priced=includedShipping({...item,retailCents},method,zip);
+  return priced?{...priced,shipping:{...priced.shipping,category:item.category}}:null;
 }

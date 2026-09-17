@@ -1,7 +1,7 @@
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {orders as defaultOrders} from './orders.mjs';
 
-export function verifyStripeEvent(raw,header,secret,now=Date.now()) {
+export function verifyStripeEvent(raw,header,secret,now=Date.now(),mode='sandbox') {
   if(!secret?.startsWith('whsec_') || typeof header!=='string') throw new Error('Invalid signature');
   const parts=header.split(',').map(p=>p.trim().split('='));
   const timestamps=parts.filter(([k])=>k==='t');
@@ -10,7 +10,7 @@ export function verifyStripeEvent(raw,header,secret,now=Date.now()) {
   const expected=createHmac('sha256',secret).update(timestamp+'.').update(raw).digest();
   if(!parts.some(([k,v])=>k==='v1' && /^[a-f0-9]{64}$/i.test(v||'') && timingSafeEqual(expected,Buffer.from(v,'hex')))) throw new Error('Invalid signature');
   const event=JSON.parse(raw.toString('utf8'));
-  if(!/^evt_[a-zA-Z0-9]+$/.test(event.id||'') || event.livemode!==false) throw new Error('Only sandbox events are accepted');
+  if(!/^evt_[a-zA-Z0-9]+$/.test(event.id||'') || event.livemode!==(mode==='live') || !['sandbox','live'].includes(mode)) throw new Error('Only sandbox events are accepted');
   return event;
 }
 

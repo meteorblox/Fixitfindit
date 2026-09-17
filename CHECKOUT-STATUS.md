@@ -1,5 +1,16 @@
 # Product checkout status
 
+## Production fulfillment backend — September 16, 2026
+
+A separate production worker and signed Stripe live webhook are implemented, but remain disabled. Live checkout creation is still blocked. Automated coverage uses mocked supplier/payment responses; no real order, supplier payment, or customer charge was made for this release.
+
+The worker stages only persisted, signed-webhook-confirmed live payments with a matching US recipient and exact variant. It rechecks stock, shipping method, and contribution before creating an unpaid CJ draft. Confirmation and payment are separate operator commands. Payment requires an explicit maximum in cents and checks the final CJ order amount against that limit and the contribution floor. Persistent claims prevent automatic retries after uncertain mutations; status reconciliation verifies supplier order identity and address before accepting tracking.
+
+Private operator commands: node production-fulfillment-cli.mjs status|submit|sync ORDER_ID; node production-fulfillment-cli.mjs pay ORDER_ID MAX_CENTS. Persistent ORDERS_DB_PATH is required. CJ_PRODUCTION_FULFILLMENT=enabled permits real supplier operations; it has NOT been enabled. LIVE_ORDER_INTAKE=enabled and STRIPE_LIVE_WEBHOOK_SECRET permit /webhooks/stripe-live; these have NOT been configured. Intake alone never submits or pays CJ orders. Do not enable these gates until live checkout preparation and account validation are complete.
+
+Remaining: live checkout with full-address pricing and coordinated quote/session expiry, real-account validation of CJ response fields and charges, refund handling, customer-facing live tracking, authenticated order administration, and the agreed 5% affiliate ledger. Tracking sync is currently manual. Existing sandbox functionality remains available.
+
+
 Updated September 16, 2026. Repository capabilities below are not proof of deployment.
 
 ## Shipping checkout implementation
