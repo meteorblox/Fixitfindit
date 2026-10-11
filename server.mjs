@@ -137,13 +137,13 @@ export const server = http.createServer(async (req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname;
     // Public discovery URLs use the verified storefront address, never the request Host.
     if (path === '/robots.txt') return send(200, 'text/plain',
-      'User-agent: *\nAllow: /\nSitemap: https://fixitfindit.com/sitemap.xml\n');
+      'User-agent: *\nAllow: /\nSitemap: https://www.fixitfindit.com/sitemap.xml\n');
     if (path === '/sitemap.xml') {
       // List stable public pages; exclude intentionally noindex partner storefronts.
       const urls = ['/', '/partners', ...Object.keys(infoPages)];
       const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-        urls.map(url => '  <url><loc>' + escape('https://fixitfindit.com' + url) + '</loc></url>').join('\n') +
+        urls.map(url => '  <url><loc>' + escape('https://www.fixitfindit.com' + url) + '</loc></url>').join('\n') +
         '\n</urlset>\n';
       return send(200, 'application/xml', xml);
     }
