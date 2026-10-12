@@ -140,7 +140,7 @@ export const server = http.createServer(async (req, res) => {
       'User-agent: *\nAllow: /\nSitemap: https://www.fixitfindit.com/sitemap.xml\n');
     if (path === '/sitemap.xml') {
       // List stable public pages; exclude intentionally noindex partner storefronts.
-      const urls = ['/', '/partners', ...Object.keys(infoPages)];
+      const urls = ['/', '/partners', ...Object.keys(infoPages), ...categories.map(c=>'/category/'+c.slug)];
       const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
         urls.map(url => '  <url><loc>' + escape('https://www.fixitfindit.com' + url) + '</loc></url>').join('\n') +
