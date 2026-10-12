@@ -3,6 +3,8 @@ import {retailPrice} from './selected-products.mjs';
 import {categories} from './catalog.mjs';
 const esc = v => String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function catalogPage(shell, {store, category, data, error, product}) {
+  const indexable = !store && !error && category && (product || data?.products?.length);
+  const canonical = indexable ? 'https://www.fixitfindit.com/category/'+encodeURIComponent(category.slug)+(product?'/product/'+encodeURIComponent(product.id):'') : null;
   const prefix = store ? `/shop/${store.slug}` : '';
   const links = categories.map(c=>`<a ${c.slug===category?.slug?'aria-current="page"':''} href="${prefix}/category/${c.slug}">${esc(c.name)}</a>`).join('');
   const price = p => retailPrice(p) || (p.pricingStatus==='pending'?'Price check in progress':'Price currently unavailable');
@@ -14,7 +16,6 @@ export function catalogPage(shell, {store, category, data, error, product}) {
   else if (data) content += `<p class="catalog-note">Collection updated ${esc(data.updatedAt)}</p><div class="grid">${data.products.some(p=>retailPrice(p))?data.products.filter(p=>retailPrice(p)).map(card).join(''):'<p>We are checking stock and delivery for this collection. Please check back shortly.</p>'}</div>`;
   else content += '<p>Select a category to browse CJ products.</p>';
   return shell.replace(/<main id="top"[^>]*>[\s\S]*?<\/main>/,`<main id="top" class="shell catalog">${content}</main>`)
-    .replace('</head>',(product?'<script src="/product-gallery.js" defer></script>':'')+'<meta name="robots" content="noindex,nofollow"></head>')
+    .replace('</head>',(product?'<script src="/product-gallery.js" defer></script>':'')+(indexable?'<link rel="canonical" href="'+esc(canonical)+'">':'<meta name="robots" content="noindex,nofollow">')+'</head>')
     .replace(/href="#(?:best|browse|kitchen|organize|top)"/g,`href="${prefix || '/'}"`);
 }
-
